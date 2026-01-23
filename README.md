@@ -258,6 +258,74 @@ export const RPC_ENDPOINTS: RpcEndpoint[] = [
 ];
 ```
 
+## Deployment
+
+### Deploying to Vercel
+
+This project is configured for easy deployment to Vercel. Vercel automatically handles React Router routing and provides a global CDN.
+
+#### Option 1: Deploy via Vercel Dashboard (Recommended)
+
+1. **Push your code to GitHub**:
+   ```bash
+   git add .
+   git commit -m "Initial commit"
+   git push origin main
+   ```
+
+2. **Import to Vercel**:
+   - Go to [vercel.com](https://vercel.com) and sign in with your GitHub account
+   - Click "Add New Project"
+   - Import your GitHub repository
+   - Vercel will auto-detect the Create React App configuration
+
+3. **Configure Environment Variables**:
+   - In the Vercel project settings, go to "Environment Variables"
+   - Add all the environment variables from your `.env` file:
+     - `REACT_APP_L1_RPC_URL`
+     - `REACT_APP_L2_RPC_URL`
+     - `REACT_APP_GATEWAY_RPC_URL`
+     - `REACT_APP_MAIN_NODE_RPC_URL`
+     - `REACT_APP_TEE_NODE_RPC_URL`
+
+4. **Deploy**:
+   - Click "Deploy"
+   - Vercel will build and deploy your app
+   - You'll get a URL like `https://your-project.vercel.app`
+
+#### Option 2: Deploy via Vercel CLI
+
+1. **Install Vercel CLI**:
+   ```bash
+   npm i -g vercel
+   ```
+
+2. **Deploy**:
+   ```bash
+   vercel
+   ```
+   - Follow the prompts to link your project
+   - Set environment variables when prompted or add them in the Vercel dashboard
+
+3. **For production deployment**:
+   ```bash
+   vercel --prod
+   ```
+
+#### Automatic Deployments
+
+Once connected to Vercel:
+- Every push to `main` branch automatically triggers a production deployment
+- Pull requests automatically get preview deployments
+- All deployments are available in the Vercel dashboard
+
+#### Custom Domain
+
+1. Go to your project settings in Vercel
+2. Navigate to "Domains"
+3. Add your custom domain
+4. Follow the DNS configuration instructions
+
 ## Building for Production
 
 ```bash
