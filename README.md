@@ -268,4 +268,6 @@ Creates an optimized production build in the `build/` directory.
 
 ## License
 
-Inherited from parent project.
+MIT License
+
+See [LICENSE](LICENSE) file for details.
