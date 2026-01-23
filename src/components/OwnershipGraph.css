@@ -1,0 +1,195 @@
+.ownership-graph {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  margin: 24px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.ownership-graph h2 {
+  margin: 0 0 24px 0;
+  font-size: 24px;
+  color: #1a202c;
+}
+
+.ownership-graph h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  color: #2d3748;
+}
+
+.ownership-graph .error {
+  color: #e53e3e;
+  padding: 12px;
+  background: #fff5f5;
+  border-radius: 4px;
+  border-left: 4px solid #e53e3e;
+}
+
+.ownership-section {
+  margin-bottom: 32px;
+}
+
+.ownership-section:last-child {
+  margin-bottom: 0;
+}
+
+.ownership-tree {
+  margin-bottom: 32px;
+  padding: 16px;
+  background: #f7fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.ownership-level {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 8px 0;
+}
+
+.ownership-node {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 20px;
+  border-radius: 6px;
+  margin: 4px;
+  min-width: 200px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.ownership-node:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.node-label {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.node-address {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: #718096;
+}
+
+.node-address.clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.node-address.clickable:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+/* Different node types */
+.root-node {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: 2px solid #5a67d8;
+}
+
+.root-node .node-address {
+  color: #e2e8f0;
+}
+
+.admin-node {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  border: 2px solid #ed64a6;
+}
+
+.admin-node .node-address {
+  color: #fef5f7;
+}
+
+.child-node {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+  border: 2px solid #3182ce;
+}
+
+.child-node .node-address {
+  color: #e6f7ff;
+}
+
+.standalone-node {
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+  color: #2d3748;
+  border: 2px solid #81e6d9;
+}
+
+.ownership-arrow {
+  font-size: 24px;
+  color: #4a5568;
+  margin: 4px 0;
+  font-weight: bold;
+}
+
+.ownership-children {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  max-width: 100%;
+}
+
+.unmanaged-contracts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .ownership-node {
+    min-width: 150px;
+    padding: 10px 16px;
+  }
+
+  .node-label {
+    font-size: 12px;
+  }
+
+  .node-address {
+    font-size: 11px;
+  }
+
+  .ownership-children {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .unmanaged-contracts {
+    flex-direction: column;
+  }
+}
+
+/* Dark mode support (optional) */
+@media (prefers-color-scheme: dark) {
+  .ownership-graph {
+    background: #1a202c;
+    color: #e2e8f0;
+  }
+
+  .ownership-graph h2,
+  .ownership-graph h3 {
+    color: #f7fafc;
+  }
+
+  .ownership-tree {
+    background: #2d3748;
+    border-color: #4a5568;
+  }
+
+  .standalone-node {
+    color: #1a202c;
+  }
+}
