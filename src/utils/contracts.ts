@@ -580,7 +580,7 @@ export function isValidAddress(address: string): boolean {
   return /^0x[a-fA-F0-9]{40}$/.test(address);
 }
 
-export function isEOA(address: string): boolean {
+export function isEOA(_address: string): boolean {
   // In a real scenario, you would check if the address is an EOA by verifying
   // if it has any code associated with it. For now, we assume it's EOA if no code.
   // This is a placeholder - actual implementation would require RPC call.

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPublicClient, http } from 'viem';
 import type { Predeploy } from '../types';
 import './OwnershipGraph.css';
