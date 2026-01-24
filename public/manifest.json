@@ -1,7 +1,12 @@
 {
-  "short_name": "L2 Monitor",
-  "name": "L2 Monitor & Management",
+  "short_name": "UniFi Monitor",
+  "name": "UniFi Monitor & Management",
   "icons": [
+    {
+      "src": "favicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
     {
       "src": "favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
