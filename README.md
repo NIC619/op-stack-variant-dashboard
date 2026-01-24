@@ -287,6 +287,7 @@ This project is configured for easy deployment to Vercel. Vercel automatically h
      - `REACT_APP_GATEWAY_RPC_URL`
      - `REACT_APP_MAIN_NODE_RPC_URL`
      - `REACT_APP_TEE_NODE_RPC_URL`
+     - `REACT_APP_ACCESS_PASSWORD` (optional - set a password to protect your deployment)
 
 4. **Deploy**:
    - Click "Deploy"
@@ -325,6 +326,28 @@ Once connected to Vercel:
 2. Navigate to "Domains"
 3. Add your custom domain
 4. Follow the DNS configuration instructions
+
+#### Password Protection
+
+The dashboard includes optional password protection that **only activates on Vercel deployments** (not in local development).
+
+**To enable password protection:**
+
+1. Set the `REACT_APP_ACCESS_PASSWORD` environment variable in Vercel:
+   - Go to your Vercel project settings
+   - Navigate to "Environment Variables"
+   - Add `REACT_APP_ACCESS_PASSWORD` with your desired password
+   - Deploy or redeploy your application
+
+2. **Local development is not affected** - when running `npm start` locally, no password is required
+
+**How it works:**
+- Password protection only activates when the site is accessed via a Vercel domain (`.vercel.app` or `.vercel.com`)
+- Authentication is stored in `sessionStorage` (cleared when the browser closes)
+- Users will see a password prompt before accessing the dashboard
+- If the password is not set in environment variables, an error message will be shown
+
+**Security Note:** This is client-side protection. For stronger security, consider using Vercel's built-in password protection (Vercel Pro feature) or implementing server-side authentication.
 
 ## Building for Production
 
