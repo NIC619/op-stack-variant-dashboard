@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { RPC_ENDPOINTS, getBlockByTag } from '../utils/rpc';
 import type { BlockInfo, RpcEndpoint } from '../types';
 import { RoleMonitor } from '../components/RoleMonitor';
+import { TEEProverMonitor } from '../components/TEEProverMonitor';
 import './ChainStatus.css';
 
 const BLOCK_TAGS = ['latest', 'safe', 'finalized'] as const;
@@ -9,9 +10,12 @@ const BLOCK_TAGS = ['latest', 'safe', 'finalized'] as const;
 // Role addresses from environment variables
 const BATCHER_ADDRESS = process.env.REACT_APP_BATCHER_ADDRESS || '';
 const PROPOSER_ADDRESS = process.env.REACT_APP_PROPOSER_ADDRESS || '';
+const DISPUTE_GAME_FACTORY_ADDRESS = process.env.REACT_APP_L1_DISPUTE_GAME_FACTORY_ADDRESS || '';
+const TEE_NODE_RPC_URL = process.env.REACT_APP_TEE_NODE_RPC_URL || '';
 
 // Warning thresholds
-const ACTIVITY_THRESHOLDS = [5, 30, 60, 240, 720, 1440]; // minutes
+const ACTIVITY_THRESHOLDS = [5, 30, 60, 240, 720, 1440]; // minutes (Batcher / Proposer)
+const TEE_ACTIVITY_THRESHOLDS = [30, 60, 120, 240, 720, 1440]; // minutes (TEE Prover)
 const BALANCE_THRESHOLDS = [5, 2.5, 1, 0.5, 0.25]; // ETH
 
 export default function ChainStatusPage() {
@@ -74,20 +78,29 @@ export default function ChainStatusPage() {
             <strong>Missing Role Addresses:</strong> Please configure REACT_APP_BATCHER_ADDRESS and REACT_APP_PROPOSER_ADDRESS in your .env file.
           </div>
         )}
-        {BATCHER_ADDRESS && PROPOSER_ADDRESS && (
+        {(BATCHER_ADDRESS || PROPOSER_ADDRESS || (DISPUTE_GAME_FACTORY_ADDRESS && TEE_NODE_RPC_URL)) && (
           <div className="roles-grid">
-            <RoleMonitor
-              roleName="Batcher"
-              address={BATCHER_ADDRESS}
-              activityThresholds={ACTIVITY_THRESHOLDS}
-              balanceThresholds={BALANCE_THRESHOLDS}
-            />
-            <RoleMonitor
-              roleName="Proposer"
-              address={PROPOSER_ADDRESS}
-              activityThresholds={ACTIVITY_THRESHOLDS}
-              balanceThresholds={BALANCE_THRESHOLDS}
-            />
+            {BATCHER_ADDRESS && (
+              <RoleMonitor
+                roleName="Batcher"
+                address={BATCHER_ADDRESS}
+                activityThresholds={ACTIVITY_THRESHOLDS}
+                balanceThresholds={BALANCE_THRESHOLDS}
+              />
+            )}
+            {PROPOSER_ADDRESS && (
+              <RoleMonitor
+                roleName="Proposer"
+                address={PROPOSER_ADDRESS}
+                activityThresholds={ACTIVITY_THRESHOLDS}
+                balanceThresholds={BALANCE_THRESHOLDS}
+              />
+            )}
+            {DISPUTE_GAME_FACTORY_ADDRESS && TEE_NODE_RPC_URL && (
+              <TEEProverMonitor
+                activityThresholds={TEE_ACTIVITY_THRESHOLDS}
+              />
+            )}
           </div>
         )}
       </div>

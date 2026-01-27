@@ -128,6 +128,15 @@ export const DISPUTE_GAME_FACTORY_ABI = [
     inputs: [{ name: 'gameType', type: 'uint32' }],
     outputs: [{ type: 'uint256' }],
   },
+  {
+    type: 'event',
+    name: 'BlockProcessed',
+    inputs: [
+      { name: 'blockNumber', type: 'uint64', indexed: true },
+      { name: 'offset', type: 'uint64', indexed: false },
+      { name: 'withdrawalCount', type: 'uint256', indexed: false },
+    ],
+  },
 ] as const satisfies Abi;
 
 // ABI for L1StandardBridge contract (uses L1ChugSplashProxy)
