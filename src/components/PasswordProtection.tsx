@@ -32,25 +32,49 @@ export default function PasswordProtection({ children }: PasswordProtectionProps
     setIsChecking(false);
   }, [isVercel]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Get password from environment variable (set in Vercel)
-    // In production, this will be available via REACT_APP_ACCESS_PASSWORD
-    const correctPassword = process.env.REACT_APP_ACCESS_PASSWORD;
+    try {
+      // Verify password via serverless function (password never exposed in client bundle)
+      const isVercel = typeof window !== 'undefined' && 
+        (window.location.hostname.includes('vercel.app') || 
+         window.location.hostname.includes('vercel.com'));
 
-    if (!correctPassword) {
-      setError('Password protection is not configured. Please set REACT_APP_ACCESS_PASSWORD environment variable.');
-      return;
-    }
+      let authenticated = false;
 
-    if (password === correctPassword) {
-      // Store authentication in sessionStorage (cleared when browser closes)
-      sessionStorage.setItem('unifi_dashboard_auth', 'authenticated');
-      setIsAuthenticated(true);
-    } else {
-      setError('Incorrect password. Please try again.');
+      if (isVercel) {
+        // On Vercel: verify password server-side
+        const response = await fetch(`${window.location.origin}/api/auth`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ password }),
+        });
+
+        const data = await response.json();
+        authenticated = data.authenticated === true;
+
+        if (!authenticated) {
+          setError(data.error || 'Incorrect password. Please try again.');
+          setPassword('');
+          return;
+        }
+      } else {
+        // Local development: skip password check (no protection needed)
+        authenticated = true;
+      }
+
+      if (authenticated) {
+        // Store authentication in sessionStorage (cleared when browser closes)
+        sessionStorage.setItem('unifi_dashboard_auth', 'authenticated');
+        setIsAuthenticated(true);
+      }
+    } catch (error) {
+      console.error('Authentication error:', error);
+      setError('Failed to verify password. Please try again.');
       setPassword('');
     }
   };

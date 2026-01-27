@@ -38,15 +38,18 @@ export function RoleMonitor({
     const fetchLastTransaction = async (client: any): Promise<{ timestamp: number; hash: string } | null> => {
       // Try to use block explorer API if configured
       const explorerApiUrl = process.env.REACT_APP_L1_EXPLORER_API_URL;
-      const explorerApiKey = process.env.REACT_APP_L1_EXPLORER_API_KEY || '';
 
       if (explorerApiUrl) {
         try {
           // Get chain ID from RPC
           const chainId = await client.getChainId();
 
-          // Fetch transaction list from block explorer (e.g., Etherscan)
-          // Get only the most recent transaction
+          // Check if we're on Vercel (use proxy to hide API key)
+          const isVercel = typeof window !== 'undefined' && 
+            (window.location.hostname.includes('vercel.app') || 
+             window.location.hostname.includes('vercel.com'));
+
+          // Build query parameters
           const params = new URLSearchParams({
             chainid: chainId.toString(),
             module: 'account',
@@ -59,11 +62,23 @@ export function RoleMonitor({
             sort: 'desc',
           });
 
-          if (explorerApiKey) {
-            params.append('apikey', explorerApiKey);
+          // Use proxy on Vercel (API key is server-side only)
+          // In local dev, API key is still exposed but that's acceptable for development
+          let apiEndpoint: string;
+          if (isVercel) {
+            // Use serverless function proxy (API key stays on server)
+            apiEndpoint = `${window.location.origin}/api/explorer-proxy?${params}`;
+          } else {
+            // Local development - direct API call (API key will be exposed in bundle)
+            // Note: For production security, always use the proxy
+            const explorerApiKey = process.env.REACT_APP_L1_EXPLORER_API_KEY || '';
+            if (explorerApiKey) {
+              params.append('apikey', explorerApiKey);
+            }
+            apiEndpoint = `${explorerApiUrl}?${params}`;
           }
 
-          const response = await fetch(`${explorerApiUrl}?${params}`);
+          const response = await fetch(apiEndpoint);
           const data = await response.json();
 
           // Etherscan v2 API format

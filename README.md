@@ -343,11 +343,41 @@ The dashboard includes optional password protection that **only activates on Ver
 
 **How it works:**
 - Password protection only activates when the site is accessed via a Vercel domain (`.vercel.app` or `.vercel.com`)
+- Password verification happens server-side via `/api/auth` (password never exposed in client bundle)
 - Authentication is stored in `sessionStorage` (cleared when the browser closes)
 - Users will see a password prompt before accessing the dashboard
-- If the password is not set in environment variables, an error message will be shown
+- If the password is not set in environment variables, access is automatically granted
 
-**Security Note:** This is client-side protection. For stronger security, consider using Vercel's built-in password protection (Vercel Pro feature) or implementing server-side authentication.
+**Security:**
+- ✅ Password is verified server-side (never exposed in client JavaScript)
+- ✅ Password stored in Vercel environment variables (server-side only)
+- ⚠️ Session-based authentication (not as secure as proper JWT tokens, but sufficient for basic protection)
+
+## Security Considerations
+
+### ⚠️ Important: API Keys and Secrets
+
+**All `REACT_APP_*` environment variables are embedded in the client-side JavaScript bundle and are publicly visible.** Anyone can:
+- View your source code in the browser
+- Inspect the JavaScript bundle
+- Extract API keys and secrets
+
+**What this means:**
+- ❌ **Never put sensitive API keys in `REACT_APP_*` variables** if they should remain secret
+- ✅ **Use serverless function proxies** for sensitive API calls (like the explorer API)
+- ✅ **Only use `REACT_APP_*` for public configuration** (RPC URLs, contract addresses, etc.)
+
+**Current Security Implementation:**
+- ✅ **Explorer API Key**: Protected via `/api/explorer-proxy` serverless function (key stays server-side on Vercel)
+- ✅ **Access Password**: Protected via `/api/auth` serverless function (password verified server-side, never exposed in client)
+- ✅ **RPC Endpoints**: Public IP addresses are proxied through `/api/rpc-proxy` (avoids CORS issues)
+- ⚠️ **Local Development**: API keys and passwords may still be exposed in local dev (acceptable for development only)
+
+**Best Practices:**
+1. Use serverless functions (like `api/explorer-proxy.js`) to proxy sensitive API calls
+2. Store API keys only in Vercel environment variables (server-side)
+3. Never commit API keys to git
+4. Rotate API keys if they've been exposed
 
 ## Building for Production
 
