@@ -21,7 +21,8 @@ module.exports = async function handler(req, res) {
   }
 
   // Get correct password from environment variable (server-side only)
-  const correctPassword = process.env.REACT_APP_ACCESS_PASSWORD;
+  // Use ACCESS_PASSWORD (without REACT_APP_ prefix) to ensure it's never in the client bundle
+  const correctPassword = process.env.ACCESS_PASSWORD;
 
   if (!correctPassword) {
     // Password protection not configured

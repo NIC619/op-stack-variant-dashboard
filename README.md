@@ -289,7 +289,7 @@ This project is configured for easy deployment to Vercel. Vercel automatically h
      - `REACT_APP_TEE_NODE_RPC_URL`
      - `REACT_APP_L1_EXPLORER_API_URL`
      - `L1_EXPLORER_API_KEY` (⚠️ **Important**: Use `L1_EXPLORER_API_KEY` without `REACT_APP_` prefix for Vercel - this keeps it server-side only)
-     - `REACT_APP_ACCESS_PASSWORD` (optional - set a password to protect your deployment)
+     - `ACCESS_PASSWORD` (optional - set a password to protect your deployment. ⚠️ **Important**: Use `ACCESS_PASSWORD` without `REACT_APP_` prefix - this keeps it server-side only)
 
 4. **Deploy**:
    - Click "Deploy"
@@ -335,10 +335,11 @@ The dashboard includes optional password protection that **only activates on Ver
 
 **To enable password protection:**
 
-1. Set the `REACT_APP_ACCESS_PASSWORD` environment variable in Vercel:
+1. Set the `ACCESS_PASSWORD` environment variable in Vercel:
    - Go to your Vercel project settings
    - Navigate to "Environment Variables"
-   - Add `REACT_APP_ACCESS_PASSWORD` with your desired password
+   - Add `ACCESS_PASSWORD` (without `REACT_APP_` prefix) with your desired password
+   - This ensures the password stays server-side only, never in the client bundle
    - Deploy or redeploy your application
 
 2. **Local development is not affected** - when running `npm start` locally, no password is required
