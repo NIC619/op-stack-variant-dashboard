@@ -22,7 +22,9 @@ module.exports = async function handler(req, res) {
   }
 
   // Get API key from environment variable (server-side only)
-  const apiKey = process.env.REACT_APP_L1_EXPLORER_API_KEY;
+  // Use L1_EXPLORER_API_KEY (without REACT_APP_ prefix) for Vercel deployment
+  // This ensures it's never embedded in the client bundle
+  const apiKey = process.env.L1_EXPLORER_API_KEY;
   const apiUrl = process.env.REACT_APP_L1_EXPLORER_API_URL;
 
   if (!apiUrl) {

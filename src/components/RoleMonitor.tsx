@@ -44,11 +44,10 @@ export function RoleMonitor({
           // Get chain ID from RPC
           const chainId = await client.getChainId();
 
-          // Check if we're on Vercel (use proxy to hide API key)
-          const isVercel = typeof window !== 'undefined' && 
-            (window.location.hostname.includes('vercel.app') || 
-             window.location.hostname.includes('vercel.com'));
-
+          // Use proxy on Vercel to keep API key server-side (never expose in client bundle)
+          // In local dev, serverless functions don't work, so we'll try the proxy first
+          // and fall back gracefully if it fails
+          
           // Build query parameters
           const params = new URLSearchParams({
             chainid: chainId.toString(),
@@ -62,15 +61,17 @@ export function RoleMonitor({
             sort: 'desc',
           });
 
-          // Use proxy on Vercel (API key is server-side only)
-          // In local dev, API key is still exposed but that's acceptable for development
+          // Check if we're on Vercel
+          const isVercel = typeof window !== 'undefined' && 
+            (window.location.hostname.includes('vercel.app') || 
+             window.location.hostname.includes('vercel.com'));
+
           let apiEndpoint: string;
-          if (isVercel) {
-            // Use serverless function proxy (API key stays on server)
+          if (isVercel && typeof window !== 'undefined') {
+            // On Vercel: use proxy with L1_EXPLORER_API_KEY (server-side only, never in bundle)
             apiEndpoint = `${window.location.origin}/api/explorer-proxy?${params}`;
           } else {
-            // Local development - direct API call (API key will be exposed in bundle)
-            // Note: For production security, always use the proxy
+            // Local dev: use REACT_APP_L1_EXPLORER_API_KEY directly (will be in bundle, but that's OK for dev)
             const explorerApiKey = process.env.REACT_APP_L1_EXPLORER_API_KEY || '';
             if (explorerApiKey) {
               params.append('apikey', explorerApiKey);

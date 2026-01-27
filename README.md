@@ -287,6 +287,8 @@ This project is configured for easy deployment to Vercel. Vercel automatically h
      - `REACT_APP_GATEWAY_RPC_URL`
      - `REACT_APP_MAIN_NODE_RPC_URL`
      - `REACT_APP_TEE_NODE_RPC_URL`
+     - `REACT_APP_L1_EXPLORER_API_URL`
+     - `L1_EXPLORER_API_KEY` (⚠️ **Important**: Use `L1_EXPLORER_API_KEY` without `REACT_APP_` prefix for Vercel - this keeps it server-side only)
      - `REACT_APP_ACCESS_PASSWORD` (optional - set a password to protect your deployment)
 
 4. **Deploy**:
@@ -368,10 +370,10 @@ The dashboard includes optional password protection that **only activates on Ver
 - ✅ **Only use `REACT_APP_*` for public configuration** (RPC URLs, contract addresses, etc.)
 
 **Current Security Implementation:**
-- ✅ **Explorer API Key**: Protected via `/api/explorer-proxy` serverless function (key stays server-side on Vercel)
+- ✅ **Explorer API Key (Vercel)**: Protected via `/api/explorer-proxy` using `L1_EXPLORER_API_KEY` (without `REACT_APP_` prefix) - key stays server-side, never in bundle
+- ⚠️ **Explorer API Key (Local Dev)**: Uses `REACT_APP_L1_EXPLORER_API_KEY` directly (exposed in bundle, but acceptable for development only)
 - ✅ **Access Password**: Protected via `/api/auth` serverless function (password verified server-side, never exposed in client)
 - ✅ **RPC Endpoints**: Public IP addresses are proxied through `/api/rpc-proxy` (avoids CORS issues)
-- ⚠️ **Local Development**: API keys and passwords may still be exposed in local dev (acceptable for development only)
 
 **Best Practices:**
 1. Use serverless functions (like `api/explorer-proxy.js`) to proxy sensitive API calls
