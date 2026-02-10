@@ -31,7 +31,7 @@ function getRpcUrl(originalUrl: string): string {
 }
 
 // Create endpoints - URLs will be resolved at runtime in getBlockByTag
-export const RPC_ENDPOINTS: RpcEndpoint[] = [
+const baseEndpoints: RpcEndpoint[] = [
   {
     name: 'Gateway Endpoint',
     url: process.env.REACT_APP_GATEWAY_RPC_URL!,
@@ -44,6 +44,19 @@ export const RPC_ENDPOINTS: RpcEndpoint[] = [
     name: 'TEE Node Endpoint',
     url: process.env.REACT_APP_TEE_NODE_RPC_URL!,
   },
+];
+
+// Optional follower node – only included if configured
+export const RPC_ENDPOINTS: RpcEndpoint[] = [
+  ...baseEndpoints,
+  ...(process.env.REACT_APP_FOLLOWER_NODE_RPC_URL
+    ? [
+        {
+          name: 'Follower Node Endpoint',
+          url: process.env.REACT_APP_FOLLOWER_NODE_RPC_URL,
+        } as RpcEndpoint,
+      ]
+    : []),
 ];
 
 export async function getBlockByTag(
