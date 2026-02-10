@@ -31,6 +31,8 @@ module.exports = async function handler(req, res) {
     process.env.REACT_APP_MAIN_NODE_RPC_URL,
     process.env.REACT_APP_TEE_NODE_RPC_URL,
     process.env.REACT_APP_L2_RPC_URL,
+    // Optional follower node
+    process.env.REACT_APP_FOLLOWER_NODE_RPC_URL,
   ].filter(Boolean);
 
   if (!allowedUrls.includes(decodedUrl)) {
