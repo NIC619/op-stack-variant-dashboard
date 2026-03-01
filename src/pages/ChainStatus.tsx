@@ -14,7 +14,8 @@ const DISPUTE_GAME_FACTORY_ADDRESS = process.env.REACT_APP_L1_DISPUTE_GAME_FACTO
 const TEE_NODE_RPC_URL = process.env.REACT_APP_TEE_NODE_RPC_URL || '';
 
 // Warning thresholds
-const ACTIVITY_THRESHOLDS = [5, 30, 60, 240, 720, 1440]; // minutes (Batcher / Proposer)
+const BATCHER_ACTIVITY_THRESHOLDS = [5, 30, 60, 240, 720, 1440]; // minutes (Batcher)
+const PROPOSER_ACTIVITY_THRESHOLDS = [30, 60, 120, 240, 720, 1440]; // minutes (Proposer)
 const TEE_ACTIVITY_THRESHOLDS = [30, 60, 120, 240, 720, 1440]; // minutes (TEE Prover)
 const BALANCE_THRESHOLDS = [5, 2.5, 1, 0.5, 0.25]; // ETH
 
@@ -84,7 +85,7 @@ export default function ChainStatusPage() {
               <RoleMonitor
                 roleName="Batcher"
                 address={BATCHER_ADDRESS}
-                activityThresholds={ACTIVITY_THRESHOLDS}
+                activityThresholds={BATCHER_ACTIVITY_THRESHOLDS}
                 balanceThresholds={BALANCE_THRESHOLDS}
               />
             )}
@@ -92,7 +93,7 @@ export default function ChainStatusPage() {
               <RoleMonitor
                 roleName="Proposer"
                 address={PROPOSER_ADDRESS}
-                activityThresholds={ACTIVITY_THRESHOLDS}
+                activityThresholds={PROPOSER_ACTIVITY_THRESHOLDS}
                 balanceThresholds={BALANCE_THRESHOLDS}
               />
             )}
