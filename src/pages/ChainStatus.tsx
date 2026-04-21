@@ -16,7 +16,7 @@ const TEE_NODE_2_RPC_URL = process.env.REACT_APP_TEE_NODE_2_RPC_URL || '';
 
 // Warning thresholds
 const BATCHER_ACTIVITY_THRESHOLDS = [5, 30, 60, 240, 720, 1440]; // minutes (Batcher)
-const PROPOSER_ACTIVITY_THRESHOLDS = [30, 60, 120, 240, 720, 1440]; // minutes (Proposer)
+const PROPOSER_ACTIVITY_THRESHOLDS = [45, 90, 120, 240, 720, 1440]; // minutes (Proposer)
 const TEE_ACTIVITY_THRESHOLDS = [30, 60, 120, 240, 720, 1440]; // minutes (TEE Prover)
 const BALANCE_THRESHOLDS = [5, 2.5, 1, 0.5, 0.25]; // ETH
 
