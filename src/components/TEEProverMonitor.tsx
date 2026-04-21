@@ -24,9 +24,56 @@ interface TEERpcStatus {
   error: string | null;
 }
 
+interface TEENode {
+  name: string;
+  url: string;
+}
+
+function queryTEERpc(rpcUrl: string): Promise<void> {
+  const isVercel = typeof window !== 'undefined' &&
+    (window.location.hostname.includes('vercel.app') ||
+     window.location.hostname.includes('vercel.com'));
+
+  let targetUrl = rpcUrl;
+  if (isVercel && /^http:\/\/\d+\.\d+\.\d+\.\d+:\d+/.test(rpcUrl)) {
+    targetUrl = window.location.origin + '/api/rpc-proxy?url=' + encodeURIComponent(rpcUrl);
+  }
+
+  return fetch(targetUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tee_getExecutionProof',
+      params: ['0x1'],
+    }),
+  }).then(async (response) => {
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    const data = await response.json();
+    if (data.error) {
+      throw new Error(data.error.message || 'JSON-RPC error');
+    }
+    if (!(data.result && data.result.proof && data.result.stateRoot && data.result.header)) {
+      throw new Error('Invalid response: missing required fields');
+    }
+  });
+}
+
 export function TEEProverMonitor({
   activityThresholds,
 }: TEEProverMonitorProps) {
+  const teeNodes: TEENode[] = [
+    process.env.REACT_APP_TEE_NODE_RPC_URL
+      ? { name: 'TEE Node 1', url: process.env.REACT_APP_TEE_NODE_RPC_URL }
+      : null,
+    process.env.REACT_APP_TEE_NODE_2_RPC_URL
+      ? { name: 'TEE Node 2', url: process.env.REACT_APP_TEE_NODE_2_RPC_URL }
+      : null,
+  ].filter((n): n is TEENode => n !== null);
+
   const [blockProcessedStatus, setBlockProcessedStatus] = useState<BlockProcessedStatus>({
     timestamp: null,
     blockNumber: null,
@@ -37,17 +84,14 @@ export function TEEProverMonitor({
     error: null,
   });
 
-  const [teeRpcStatus, setTeeRpcStatus] = useState<TEERpcStatus>({
-    ok: false,
-    loading: true,
-    error: null,
-  });
+  const [teeRpcStatuses, setTeeRpcStatuses] = useState<TEERpcStatus[]>(
+    teeNodes.map(() => ({ ok: false, loading: true, error: null }))
+  );
 
   useEffect(() => {
     const disputeGameFactoryAddress = process.env.REACT_APP_L1_DISPUTE_GAME_FACTORY_ADDRESS;
-    const teeNodeUrl = process.env.REACT_APP_TEE_NODE_RPC_URL;
 
-    if (!disputeGameFactoryAddress || !teeNodeUrl) {
+    if (!disputeGameFactoryAddress || teeNodes.length === 0) {
       return;
     }
 
@@ -62,7 +106,6 @@ export function TEEProverMonitor({
         const blocksToCheck = 7_200n;
         const fromBlock = currentBlock > blocksToCheck ? currentBlock - blocksToCheck : 0n;
 
-        // Find the BlockProcessed event from the ABI
         const blockProcessedEvent = DISPUTE_GAME_FACTORY_ABI.find(
           (item) => item.type === 'event' && item.name === 'BlockProcessed'
         );
@@ -91,14 +134,12 @@ export function TEEProverMonitor({
           return;
         }
 
-        // Sort by block number descending and take the latest
         const latestLog = logs.sort((a, b) => {
           const aBlock = a.blockNumber || 0n;
           const bBlock = b.blockNumber || 0n;
           return aBlock > bBlock ? -1 : aBlock < bBlock ? 1 : 0;
         })[0];
 
-        // Get the block to get timestamp
         const block = await client.getBlock({
           blockNumber: latestLog.blockNumber,
         });
@@ -127,70 +168,34 @@ export function TEEProverMonitor({
       }
     };
 
-    const fetchTEERpc = async () => {
-      try {
-        // Use the same proxy logic as rpc.ts
-        const isVercel = typeof window !== 'undefined' && 
-          (window.location.hostname.includes('vercel.app') || 
-           window.location.hostname.includes('vercel.com'));
-        
-        let rpcUrl = teeNodeUrl;
-        if (isVercel && /^http:\/\/\d+\.\d+\.\d+\.\d+:\d+/.test(teeNodeUrl)) {
-          rpcUrl = window.location.origin + '/api/rpc-proxy?url=' + encodeURIComponent(teeNodeUrl);
-        }
-
-        const response = await fetch(rpcUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: 1,
-            method: 'tee_getExecutionProof',
-            params: ['0x1'],
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        // Check for JSON-RPC error
-        if (data.error) {
-          throw new Error(data.error.message || 'JSON-RPC error');
-        }
-
-        // Check for valid result with expected fields
-        if (data.result && data.result.proof && data.result.stateRoot && data.result.header) {
-          setTeeRpcStatus({
-            ok: true,
-            loading: false,
-            error: null,
-          });
-        } else {
-          throw new Error('Invalid response: missing required fields');
-        }
-      } catch (error) {
-        console.error('Error querying TEE RPC:', error);
-        setTeeRpcStatus({
-          ok: false,
-          loading: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
+    const fetchTEERpcAll = async () => {
+      const results = await Promise.all(
+        teeNodes.map(async (node): Promise<TEERpcStatus> => {
+          try {
+            await queryTEERpc(node.url);
+            return { ok: true, loading: false, error: null };
+          } catch (error) {
+            console.error(`Error querying TEE RPC (${node.name}):`, error);
+            return {
+              ok: false,
+              loading: false,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            };
+          }
+        })
+      );
+      setTeeRpcStatuses(results);
     };
 
     const fetchAll = async () => {
-      await Promise.all([fetchBlockProcessed(), fetchTEERpc()]);
+      await Promise.all([fetchBlockProcessed(), fetchTEERpcAll()]);
     };
 
     fetchAll();
     // Refresh every 30 seconds
     const interval = setInterval(fetchAll, 30000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activityThresholds]);
 
   const getActivityWarningLevel = (): { level: number; message: string } | null => {
@@ -201,7 +206,6 @@ export function TEEProverMonitor({
     const now = Math.floor(Date.now() / 1000);
     const minutesSinceLastEvent = Math.floor((now - blockProcessedStatus.timestamp) / 60);
 
-    // Check thresholds in descending order (most severe first)
     for (let i = activityThresholds.length - 1; i >= 0; i--) {
       if (minutesSinceLastEvent >= activityThresholds[i]) {
         return {
@@ -211,7 +215,7 @@ export function TEEProverMonitor({
       }
     }
 
-    return null; // No warning
+    return null;
   };
 
   const formatTimestamp = (timestamp: number | null): string => {
@@ -257,14 +261,14 @@ export function TEEProverMonitor({
   };
 
   const disputeGameFactoryAddress = process.env.REACT_APP_L1_DISPUTE_GAME_FACTORY_ADDRESS;
-  const teeNodeUrl = process.env.REACT_APP_TEE_NODE_RPC_URL;
 
-  if (!disputeGameFactoryAddress || !teeNodeUrl) {
-    return null; // Don't render if not configured
+  if (!disputeGameFactoryAddress || teeNodes.length === 0) {
+    return null;
   }
 
-  const isLoading = blockProcessedStatus.loading || teeRpcStatus.loading;
-  const hasError = blockProcessedStatus.error || teeRpcStatus.error;
+  const isLoading = blockProcessedStatus.loading || teeRpcStatuses.some(s => s.loading);
+  const allServicesFailed = teeRpcStatuses.length > 0 && teeRpcStatuses.every(s => !s.ok && !s.loading);
+  const hasFatalError = !blockProcessedStatus.timestamp && allServicesFailed;
 
   return (
     <div className="role-monitor-card">
@@ -274,10 +278,12 @@ export function TEEProverMonitor({
 
       {isLoading ? (
         <div className="role-status">Loading...</div>
-      ) : hasError && !blockProcessedStatus.timestamp && !teeRpcStatus.ok ? (
+      ) : hasFatalError ? (
         <div className="role-status error">
           {blockProcessedStatus.error && <div>BlockProcessed: {blockProcessedStatus.error}</div>}
-          {teeRpcStatus.error && <div>TEE RPC: {teeRpcStatus.error}</div>}
+          {teeRpcStatuses.map((status, idx) => (
+            status.error && <div key={idx}>{teeNodes[idx].name} RPC: {status.error}</div>
+          ))}
         </div>
       ) : (
         <>
@@ -330,25 +336,31 @@ export function TEEProverMonitor({
             )}
           </div>
 
-          {/* TEE RPC Status */}
-          <div className="status-section">
-            <h4>TEE Prover Service</h4>
-            <div className="status-item">
-              <span className="status-label">Status:</span>
-              <span className="status-value">
-                {teeRpcStatus.ok ? (
-                  <span style={{ color: '#38a169', fontWeight: 600 }}>✓ OK</span>
-                ) : (
-                  <span style={{ color: '#e53e3e', fontWeight: 600 }}>✗ Error</span>
+          {/* Per-node TEE RPC Status */}
+          {teeNodes.map((node, idx) => {
+            const status = teeRpcStatuses[idx];
+            if (!status) return null;
+            return (
+              <div className="status-section" key={node.url}>
+                <h4>{node.name} Prover Service</h4>
+                <div className="status-item">
+                  <span className="status-label">Status:</span>
+                  <span className="status-value">
+                    {status.ok ? (
+                      <span style={{ color: '#38a169', fontWeight: 600 }}>✓ OK</span>
+                    ) : (
+                      <span style={{ color: '#e53e3e', fontWeight: 600 }}>✗ Error</span>
+                    )}
+                  </span>
+                </div>
+                {status.error && (
+                  <div className="role-status error" style={{ marginTop: '12px', padding: '12px' }}>
+                    {status.error}
+                  </div>
                 )}
-              </span>
-            </div>
-            {teeRpcStatus.error && (
-              <div className="role-status error" style={{ marginTop: '12px', padding: '12px' }}>
-                {teeRpcStatus.error}
               </div>
-            )}
-          </div>
+            );
+          })}
         </>
       )}
     </div>

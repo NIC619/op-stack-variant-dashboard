@@ -41,14 +41,22 @@ const baseEndpoints: RpcEndpoint[] = [
     url: process.env.REACT_APP_MAIN_NODE_RPC_URL!,
   },
   {
-    name: 'TEE Node Endpoint',
+    name: 'TEE Node 1 Endpoint',
     url: process.env.REACT_APP_TEE_NODE_RPC_URL!,
   },
 ];
 
-// Optional follower node – only included if configured
+// Optional endpoints – only included if configured
 export const RPC_ENDPOINTS: RpcEndpoint[] = [
   ...baseEndpoints,
+  ...(process.env.REACT_APP_TEE_NODE_2_RPC_URL
+    ? [
+        {
+          name: 'TEE Node 2 Endpoint',
+          url: process.env.REACT_APP_TEE_NODE_2_RPC_URL,
+        } as RpcEndpoint,
+      ]
+    : []),
   ...(process.env.REACT_APP_FOLLOWER_NODE_RPC_URL
     ? [
         {
