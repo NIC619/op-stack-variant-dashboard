@@ -1,7 +1,14 @@
-import { useState, useEffect } from 'react';
-import { createPublicClient, http } from 'viem';
+import { useState, useEffect, useRef } from 'react';
+import { createPublicClient, http, type PublicClient } from 'viem';
 import { DEFAULT_L1_RPC_URL } from '../utils/contracts';
 import { DISPUTE_GAME_FACTORY_ABI } from '../utils/l1abis';
+import {
+  decodeTeeProof,
+  checkPoeAgainstEnvelope,
+  recoverProverSigner,
+  type FieldCheck,
+} from '../utils/teeProof';
+import { getProverInstance, getRegistryChainId } from '../utils/proverRegistry';
 import './RoleMonitor.css';
 
 interface TEEProverMonitorProps {
@@ -18,10 +25,35 @@ interface BlockProcessedStatus {
   error: string | null;
 }
 
+interface DecodedProofStatus {
+  proverId: bigint;
+  signer: `0x${string}`;
+  registryAddr: `0x${string}` | null;
+  registryAddrMatch: boolean | null; // null when registry lookup failed
+  validUntil: bigint | null;
+  teeType: number | null;
+  elType: number | null;
+  fieldCheck: FieldCheck;
+  registryError?: string;
+}
+
 interface TEERpcStatus {
   ok: boolean;
   loading: boolean;
   error: string | null;
+  decoded?: DecodedProofStatus;
+  decodeError?: string;
+}
+
+interface TEEProofResult {
+  proof: `0x${string}`;
+  stateRoot: `0x${string}`;
+  header: {
+    hash: `0x${string}`;
+    number: number;
+    parentHash: `0x${string}`;
+    timestamp: number;
+  };
 }
 
 interface TEENode {
@@ -29,7 +61,7 @@ interface TEENode {
   url: string;
 }
 
-function queryTEERpc(rpcUrl: string): Promise<void> {
+function fetchTEEProof(rpcUrl: string): Promise<TEEProofResult> {
   const isVercel = typeof window !== 'undefined' &&
     (window.location.hostname.includes('vercel.app') ||
      window.location.hostname.includes('vercel.com'));
@@ -56,9 +88,11 @@ function queryTEERpc(rpcUrl: string): Promise<void> {
     if (data.error) {
       throw new Error(data.error.message || 'JSON-RPC error');
     }
-    if (!(data.result && data.result.proof && data.result.stateRoot && data.result.header)) {
+    const result = data.result;
+    if (!(result && result.proof && result.stateRoot && result.header)) {
       throw new Error('Invalid response: missing required fields');
     }
+    return result as TEEProofResult;
   });
 }
 
@@ -87,6 +121,8 @@ export function TEEProverMonitor({
   const [teeRpcStatuses, setTeeRpcStatuses] = useState<TEERpcStatus[]>(
     teeNodes.map(() => ({ ok: false, loading: true, error: null }))
   );
+
+  const registryChainIdRef = useRef<bigint | null>(null);
 
   useEffect(() => {
     const disputeGameFactoryAddress = process.env.REACT_APP_L1_DISPUTE_GAME_FACTORY_ADDRESS;
@@ -168,12 +204,118 @@ export function TEEProverMonitor({
       }
     };
 
+    const registryAddr = (process.env.REACT_APP_L1_PROVER_REGISTRY_ADDRESS || '') as `0x${string}`;
+    const registryEnabled = /^0x[0-9a-fA-F]{40}$/.test(registryAddr);
+
+    const l1Client = createPublicClient({
+      transport: http(process.env.REACT_APP_L1_RPC_URL || DEFAULT_L1_RPC_URL),
+    }) as PublicClient;
+
+    const resolveChainId = async (): Promise<bigint | null> => {
+      if (!registryEnabled) return null;
+      if (registryChainIdRef.current !== null) return registryChainIdRef.current;
+      try {
+        const id = await getRegistryChainId(l1Client, registryAddr);
+        registryChainIdRef.current = id;
+        return id;
+      } catch (err) {
+        console.error('Error reading ProverRegistry.chainID():', err);
+        return null;
+      }
+    };
+
+    const decodeFor = async (
+      result: TEEProofResult,
+    ): Promise<{ decoded?: DecodedProofStatus; decodeError?: string }> => {
+      try {
+        const signed = decodeTeeProof(result.proof);
+        const fieldCheck = checkPoeAgainstEnvelope(signed, {
+          stateRoot: result.stateRoot,
+          header: result.header,
+        });
+
+        if (!registryEnabled) {
+          return {
+            decoded: {
+              proverId: signed.id,
+              signer: '0x0000000000000000000000000000000000000000',
+              registryAddr: null,
+              registryAddrMatch: null,
+              validUntil: null,
+              teeType: null,
+              elType: null,
+              fieldCheck,
+              registryError: 'Registry lookup unavailable',
+            },
+          };
+        }
+
+        const chainId = await resolveChainId();
+        if (chainId === null) {
+          // decode succeeded but chainID read failed
+          const signer = '0x0000000000000000000000000000000000000000' as `0x${string}`;
+          return {
+            decoded: {
+              proverId: signed.id,
+              signer,
+              registryAddr,
+              registryAddrMatch: null,
+              validUntil: null,
+              teeType: null,
+              elType: null,
+              fieldCheck,
+              registryError: 'Registry lookup unavailable',
+            },
+          };
+        }
+
+        const signer = await recoverProverSigner(signed, chainId, registryAddr);
+
+        let instance: Awaited<ReturnType<typeof getProverInstance>> | null = null;
+        let registryError: string | undefined;
+        try {
+          instance = await getProverInstance(l1Client, registryAddr, signed.id);
+        } catch (err) {
+          registryError = err instanceof Error ? err.message : 'Registry call failed';
+        }
+
+        const registryAddrMatch = instance
+          ? instance.addr.toLowerCase() === signer.toLowerCase()
+          : null;
+
+        return {
+          decoded: {
+            proverId: signed.id,
+            signer,
+            registryAddr,
+            registryAddrMatch,
+            validUntil: instance ? instance.validUntil : null,
+            teeType: instance ? instance.teeType : null,
+            elType: instance ? instance.elType : null,
+            fieldCheck,
+            registryError,
+          },
+        };
+      } catch (err) {
+        return {
+          decodeError: err instanceof Error ? err.message : 'Decode failed',
+        };
+      }
+    };
+
     const fetchTEERpcAll = async () => {
       const results = await Promise.all(
         teeNodes.map(async (node): Promise<TEERpcStatus> => {
           try {
-            await queryTEERpc(node.url);
-            return { ok: true, loading: false, error: null };
+            const result = await fetchTEEProof(node.url);
+            const { decoded, decodeError } = await decodeFor(result);
+            return {
+              ok: !decodeError,
+              loading: false,
+              error: null,
+              decoded,
+              decodeError,
+            };
           } catch (error) {
             console.error(`Error querying TEE RPC (${node.name}):`, error);
             return {
@@ -358,10 +500,171 @@ export function TEEProverMonitor({
                     {status.error}
                   </div>
                 )}
+                <SignedProofBlock status={status} />
               </div>
             );
           })}
         </>
+      )}
+    </div>
+  );
+}
+
+function truncateAddr(addr: `0x${string}`): string {
+  if (addr.length <= 12) return addr;
+  return `${addr.slice(0, 8)}…${addr.slice(-6)}`;
+}
+
+function formatValidUntil(ts: bigint): string {
+  const n = Number(ts);
+  if (!Number.isFinite(n) || n === 0) return 'Unknown';
+  return new Date(n * 1000).toLocaleString('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+function SignedProofBlock({ status }: { status: TEERpcStatus }) {
+  if (status.decodeError) {
+    return (
+      <div className="status-section" style={{ marginTop: '12px' }}>
+        <h4>Signed Proof</h4>
+        <div className="role-status error" style={{ padding: '12px' }}>
+          Decode failed: {status.decodeError}
+        </div>
+      </div>
+    );
+  }
+
+  const d = status.decoded;
+  if (!d) return null;
+
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  const expired = d.validUntil !== null && d.validUntil > 0n && d.validUntil < now;
+  const unknownId =
+    d.registryAddrMatch !== null &&
+    d.registryAddr !== null &&
+    (!d.validUntil ||
+      (d.validUntil === 0n &&
+        d.teeType === 0 &&
+        d.elType === 0));
+
+  const signerRed = d.registryAddrMatch === false || unknownId;
+  const amber = !signerRed && (expired || !d.fieldCheck.ok);
+
+  return (
+    <div className="status-section" style={{ marginTop: '12px' }}>
+      <h4>Signed Proof</h4>
+
+      <div className="status-item">
+        <span className="status-label">Prover Instance:</span>
+        <span className="status-value">
+          {d.proverId.toString()}
+          {d.teeType !== null && d.elType !== null && (
+            <>
+              {' '}
+              [TEE 0x{d.teeType.toString(16).padStart(2, '0')} · EL 0x
+              {d.elType.toString(16).padStart(2, '0')}]
+            </>
+          )}
+        </span>
+      </div>
+
+      <div className="status-item">
+        <span className="status-label">Signer:</span>
+        <span className="status-value">
+          {d.registryAddrMatch === null ? (
+            <>
+              {truncateAddr(d.signer)}{' '}
+              <span style={{ color: '#718096' }}>(registry lookup unavailable)</span>
+            </>
+          ) : d.registryAddrMatch ? (
+            <>
+              {truncateAddr(d.signer)}{' '}
+              <span style={{ color: '#38a169', fontWeight: 600 }}>✓ matches registry</span>
+            </>
+          ) : unknownId ? (
+            <>
+              {truncateAddr(d.signer)}{' '}
+              <span style={{ color: '#e53e3e', fontWeight: 600 }}>✗ unknown prover id</span>
+            </>
+          ) : (
+            <>
+              {truncateAddr(d.signer)}{' '}
+              <span style={{ color: '#e53e3e', fontWeight: 600 }}>
+                ✗ signer not registered
+              </span>
+            </>
+          )}
+        </span>
+      </div>
+
+      {d.validUntil !== null && d.validUntil > 0n && (
+        <div className="status-item">
+          <span className="status-label">Valid Until:</span>
+          <span className="status-value">
+            {formatValidUntil(d.validUntil)}
+            {expired && (
+              <span style={{ color: '#d69e2e', fontWeight: 600, marginLeft: 8 }}>
+                ⚠️ expired
+              </span>
+            )}
+          </span>
+        </div>
+      )}
+
+      <div className="status-item">
+        <span className="status-label">Field Consistency:</span>
+        <span className="status-value">
+          {d.fieldCheck.ok ? (
+            <span style={{ color: '#38a169', fontWeight: 600 }}>
+              ✓ all fields match envelope
+            </span>
+          ) : (
+            <span style={{ color: '#d69e2e', fontWeight: 600 }}>
+              ✗ {d.fieldCheck.mismatches.length} mismatch
+              {d.fieldCheck.mismatches.length === 1 ? '' : 'es'}
+            </span>
+          )}
+        </span>
+      </div>
+
+      {!d.fieldCheck.ok && (
+        <div className="warning-box warning-medium" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+          {d.fieldCheck.mismatches.map((m, i) => (
+            <div key={i} style={{ fontFamily: 'monospace', fontSize: '0.85em' }}>{m}</div>
+          ))}
+        </div>
+      )}
+
+      {d.registryError && d.registryAddrMatch === null && (
+        <div style={{ color: '#718096', fontSize: '0.85em', marginTop: 8 }}>
+          Registry lookup unavailable{d.registryError ? `: ${d.registryError}` : ''}
+        </div>
+      )}
+
+      {amber && d.fieldCheck.ok && expired && (
+        <div className="warning-box warning-medium">
+          <span className="warning-icon">⚠️</span>
+          <span className="warning-message">
+            Attestation expired @ {formatValidUntil(d.validUntil!)}
+          </span>
+        </div>
+      )}
+
+      {signerRed && (
+        <div className="warning-box warning-critical">
+          <span className="warning-icon">⚠️</span>
+          <span className="warning-message">
+            {unknownId
+              ? `Unknown prover id ${d.proverId.toString()}`
+              : 'Signer not registered / mismatch'}
+          </span>
+        </div>
       )}
     </div>
   );

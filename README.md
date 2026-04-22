@@ -60,6 +60,14 @@ REACT_APP_L2_RPC_URL=http://your-l2-rpc-url
 REACT_APP_GATEWAY_RPC_URL=https://your-gateway-rpc-url
 REACT_APP_MAIN_NODE_RPC_URL=http://your-main-node-rpc-url
 REACT_APP_TEE_NODE_RPC_URL=http://your-tee-node-rpc-url
+# Optional second TEE node for Chain Status monitoring
+REACT_APP_TEE_NODE_2_RPC_URL=http://your-second-tee-node-rpc-url
+
+# Optional: enables "Signed Proof" decoding per TEE node in Chain Status.
+# When set, each TEE prover's returned signature is recovered and compared
+# against attestedProvers(id) on the L1 ProverRegistry. Leave unset to fall
+# back to the basic RPC shape-check only.
+REACT_APP_L1_PROVER_REGISTRY_ADDRESS=0x...
 ```
 
 2. **Wagmi Configuration**: Edit `src/config/wagmi.ts` to update:
