@@ -6,6 +6,8 @@
 //
 // Falls back to REACT_APP_L1_RPC_URL, then to the public Hoodi endpoint, so the
 // app still works when no secret is configured.
+const { requireAuth } = require('../lib/auth');
+
 module.exports = async function handler(req, res) {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -20,6 +22,9 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  // Require a valid auth cookie (no-op if ACCESS_PASSWORD is not configured).
+  if (!requireAuth(req, res)) return;
 
   // Resolve the upstream URL entirely server-side — never from the client.
   const upstreamUrl =

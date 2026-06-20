@@ -1,3 +1,5 @@
+const { requireAuth } = require('../lib/auth');
+
 module.exports = async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -13,6 +15,9 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  // Require a valid auth cookie (no-op if ACCESS_PASSWORD is not configured).
+  if (!requireAuth(req, res)) return;
 
   // Get parameters from query string
   const { chainid, module, action, address, startblock, endblock, page, offset, sort } = req.query;

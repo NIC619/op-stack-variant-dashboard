@@ -1,3 +1,5 @@
+const { issueToken, buildAuthCookie } = require('../lib/auth');
+
 module.exports = async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -34,12 +36,14 @@ module.exports = async function handler(req, res) {
 
   // Verify password (server-side comparison - password never exposed)
   if (password === correctPassword) {
-    // Generate a simple token (in production, use a proper JWT or session token)
-    const token = Buffer.from(`${Date.now()}-${Math.random()}`).toString('base64');
-    
-    return res.status(200).json({ 
+    // Issue a signed, HttpOnly cookie. Protected proxies (/api/l1-rpc, etc.)
+    // verify this cookie before forwarding, so the API routes can't be driven
+    // directly by anyone who just knows the deployment URL.
+    const token = issueToken();
+    res.setHeader('Set-Cookie', buildAuthCookie(token));
+
+    return res.status(200).json({
       authenticated: true,
-      token: token
     });
   } else {
     return res.status(401).json({ 
