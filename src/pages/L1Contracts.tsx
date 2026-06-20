@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { createPublicClient, http } from 'viem';
 import { L1_CONTRACTS } from '../config/l1contracts';
-import { getContractInfo, generateTransferOwnershipCalldata, generateChangeProxyAdminCalldata, generateUpgradeCalldata, isValidAddress, DEFAULT_L1_RPC_URL } from '../utils/contracts';
+import { getContractInfo, generateTransferOwnershipCalldata, generateChangeProxyAdminCalldata, generateUpgradeCalldata, isValidAddress, getL1RpcUrl } from '../utils/contracts';
 import ContractCard from '../components/ContractCard';
 import { OwnershipGraph } from '../components/OwnershipGraph';
 import { PauseFlowGraph } from '../components/PauseFlowGraph';
@@ -47,7 +47,7 @@ export default function L1ContractsPage() {
 
       try {
         const client = createPublicClient({
-          transport: http(process.env.REACT_APP_L1_RPC_URL || DEFAULT_L1_RPC_URL),
+          transport: http(getL1RpcUrl()),
         });
 
         const guardian = await client.readContract({
@@ -73,7 +73,7 @@ export default function L1ContractsPage() {
 
     setActionInProgress(true);
     try {
-      const contractInfo = await getContractInfo(predeploy.address, DEFAULT_L1_RPC_URL);
+      const contractInfo = await getContractInfo(predeploy.address, getL1RpcUrl());
 
       if (!contractInfo.owner) {
         alert('Could not retrieve current owner');
@@ -92,7 +92,7 @@ export default function L1ContractsPage() {
         calldata = generateChangeProxyAdminCalldata(predeploy.address, newOwner);
 
         // Get the owner of ProxyAdmin contract
-        const proxyAdminInfo = await getContractInfo(PROXY_ADMIN_ADDRESS, DEFAULT_L1_RPC_URL);
+        const proxyAdminInfo = await getContractInfo(PROXY_ADMIN_ADDRESS, getL1RpcUrl());
         if (!proxyAdminInfo.owner) {
           alert('Could not retrieve ProxyAdmin owner');
           return;
@@ -146,7 +146,7 @@ export default function L1ContractsPage() {
   const handleWithdraw = async (predeploy: typeof L1_CONTRACTS[0]) => {
     setActionInProgress(true);
     try {
-      const contractInfo = await getContractInfo(predeploy.address, DEFAULT_L1_RPC_URL);
+      const contractInfo = await getContractInfo(predeploy.address, getL1RpcUrl());
 
       if (!contractInfo.owner) {
         alert('Could not retrieve current owner');
@@ -189,7 +189,7 @@ export default function L1ContractsPage() {
 
     setActionInProgress(true);
     try {
-      const contractInfo = await getContractInfo(predeploy.address, DEFAULT_L1_RPC_URL);
+      const contractInfo = await getContractInfo(predeploy.address, getL1RpcUrl());
 
       if (!contractInfo.owner) {
         alert('Could not retrieve current admin');
@@ -208,7 +208,7 @@ export default function L1ContractsPage() {
         calldata = generateUpgradeCalldata(predeploy.address, newImplementation);
 
         // Get the owner of ProxyAdmin contract
-        const proxyAdminInfo = await getContractInfo(PROXY_ADMIN_ADDRESS, DEFAULT_L1_RPC_URL);
+        const proxyAdminInfo = await getContractInfo(PROXY_ADMIN_ADDRESS, getL1RpcUrl());
         if (!proxyAdminInfo.owner) {
           alert('Could not retrieve ProxyAdmin owner');
           return;
@@ -324,14 +324,14 @@ export default function L1ContractsPage() {
               setActionType('upgrade');
             }}
             connectedAddress={connectedAddress}
-            rpcUrl={DEFAULT_L1_RPC_URL}
+            rpcUrl={getL1RpcUrl()}
           />
         ))}
       </div>
 
       <OwnershipGraph
         contracts={L1_CONTRACTS}
-        rpcUrl={process.env.REACT_APP_L1_RPC_URL || DEFAULT_L1_RPC_URL}
+        rpcUrl={getL1RpcUrl()}
       />
 
       <PauseFlowGraph

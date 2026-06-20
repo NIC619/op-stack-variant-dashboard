@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPublicClient, http, type PublicClient } from 'viem';
-import { DEFAULT_L1_RPC_URL } from '../utils/contracts';
+import { getL1RpcUrl } from '../utils/contracts';
 import { DISPUTE_GAME_FACTORY_ABI } from '../utils/l1abis';
 import {
   decodeTeeProof,
@@ -134,7 +134,7 @@ export function TEEProverMonitor({
     const fetchBlockProcessed = async () => {
       try {
         const client = createPublicClient({
-          transport: http(process.env.REACT_APP_L1_RPC_URL || DEFAULT_L1_RPC_URL),
+          transport: http(getL1RpcUrl()),
         });
 
         const currentBlock = await client.getBlockNumber();
@@ -208,7 +208,7 @@ export function TEEProverMonitor({
     const registryEnabled = /^0x[0-9a-fA-F]{40}$/.test(registryAddr);
 
     const l1Client = createPublicClient({
-      transport: http(process.env.REACT_APP_L1_RPC_URL || DEFAULT_L1_RPC_URL),
+      transport: http(getL1RpcUrl()),
     }) as PublicClient;
 
     const resolveChainId = async (): Promise<bigint | null> => {

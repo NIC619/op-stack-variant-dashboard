@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPublicClient, http, formatEther } from 'viem';
-import { DEFAULT_L1_RPC_URL } from '../utils/contracts';
+import { getL1RpcUrl } from '../utils/contracts';
 import './RoleMonitor.css';
 
 interface RoleMonitorProps {
@@ -136,7 +136,7 @@ export function RoleMonitor({
     const fetchRoleStatus = async () => {
       try {
         const client = createPublicClient({
-          transport: http(process.env.REACT_APP_L1_RPC_URL || DEFAULT_L1_RPC_URL),
+          transport: http(getL1RpcUrl()),
         });
 
         // Fetch balance and latest transaction in parallel

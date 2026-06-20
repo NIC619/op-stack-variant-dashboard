@@ -2,14 +2,31 @@ import { createPublicClient, http, type Abi } from 'viem';
 import { L1_CONTRACT_ABIS, L1_STANDARD_BRIDGE_ABI } from './l1abis';
 
 // RPC URLs from environment variables
-if (!process.env.REACT_APP_L1_RPC_URL) {
-  throw new Error('REACT_APP_L1_RPC_URL is not set. Please create a .env file with REACT_APP_L1_RPC_URL configured.');
-}
 if (!process.env.REACT_APP_L2_RPC_URL) {
   throw new Error('REACT_APP_L2_RPC_URL is not set. Please create a .env file with REACT_APP_L2_RPC_URL configured.');
 }
-export const DEFAULT_L1_RPC_URL = process.env.REACT_APP_L1_RPC_URL;
 export const DEFAULT_L2_RPC_URL = process.env.REACT_APP_L2_RPC_URL;
+
+// Resolve the L1 RPC URL the frontend should talk to.
+//
+// On a deployed host we route through the server-side proxy (/api/l1-rpc) so the
+// real upstream URL — which may be a paid/authenticated endpoint — is never baked
+// into the client bundle. Only on local dev (`npm start`, where /api functions are
+// not served) do we connect directly to REACT_APP_L1_RPC_URL.
+export function getL1RpcUrl(): string {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+    if (!isLocal) {
+      return `${window.location.origin}/api/l1-rpc`;
+    }
+  }
+  return process.env.REACT_APP_L1_RPC_URL || 'https://ethereum-hoodi-rpc.publicnode.com';
+}
+
+// Backwards-compatible alias. Prefer getL1RpcUrl() so the proxy decision is made
+// at call time (in the browser) rather than at module-eval time.
+export const DEFAULT_L1_RPC_URL = getL1RpcUrl();
 
 // ABI for Proxy contracts (to get admin)
 export const PROXY_ABI = [
