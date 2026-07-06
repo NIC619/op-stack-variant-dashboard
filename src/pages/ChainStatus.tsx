@@ -7,6 +7,12 @@ import './ChainStatus.css';
 
 const BLOCK_TAGS = ['latest', 'safe', 'finalized'] as const;
 
+// Group endpoints into layers for the Block Information section.
+// Primary  → Main Node & Gateways (top layer)
+// Secondary → TEE Nodes & Follower Node (second layer)
+const PRIMARY_ENDPOINTS = RPC_ENDPOINTS.filter(e => e.tier === 'primary');
+const SECONDARY_ENDPOINTS = RPC_ENDPOINTS.filter(e => e.tier !== 'primary');
+
 // Role addresses from environment variables
 const BATCHER_ADDRESS = process.env.REACT_APP_BATCHER_ADDRESS || '';
 const PROPOSER_ADDRESS = process.env.REACT_APP_PROPOSER_ADDRESS || '';
@@ -53,22 +59,27 @@ export default function ChainStatusPage() {
             🔍 Test Custom RPC
           </button>
         </div>
-        <div className="endpoints-grid" key={`blocks-${refreshKey}`}>
-          {RPC_ENDPOINTS.map(endpoint => (
-            <div key={endpoint.url} className="endpoint-card">
-              <h3 className="endpoint-name">{endpoint.name}</h3>
-              <p className="endpoint-url">{endpoint.url}</p>
-
-              <div className="tags-container">
-                {BLOCK_TAGS.map(tag => (
-                  <div key={tag} className="tag-section">
-                    <h4 className="tag-name">{tag.charAt(0).toUpperCase() + tag.slice(1)}</h4>
-                    <BlockDisplay endpoint={endpoint} tag={tag} />
-                  </div>
+        <div key={`blocks-${refreshKey}`}>
+          {PRIMARY_ENDPOINTS.length > 0 && (
+            <div className="endpoints-layer">
+              <h3 className="layer-title">Main Node &amp; Gateways</h3>
+              <div className="endpoints-grid">
+                {PRIMARY_ENDPOINTS.map(endpoint => (
+                  <EndpointCard key={endpoint.url} endpoint={endpoint} />
                 ))}
               </div>
             </div>
-          ))}
+          )}
+          {SECONDARY_ENDPOINTS.length > 0 && (
+            <div className="endpoints-layer">
+              <h3 className="layer-title">TEE Nodes &amp; Follower Node</h3>
+              <div className="endpoints-grid">
+                {SECONDARY_ENDPOINTS.map(endpoint => (
+                  <EndpointCard key={endpoint.url} endpoint={endpoint} />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -111,6 +122,24 @@ export default function ChainStatusPage() {
       {showTestRpcModal && (
         <TestRpcModal onClose={() => setShowTestRpcModal(false)} />
       )}
+    </div>
+  );
+}
+
+function EndpointCard({ endpoint }: { endpoint: RpcEndpoint }) {
+  return (
+    <div className="endpoint-card">
+      <h3 className="endpoint-name">{endpoint.name}</h3>
+      <p className="endpoint-url">{endpoint.url}</p>
+
+      <div className="tags-container">
+        {BLOCK_TAGS.map(tag => (
+          <div key={tag} className="tag-section">
+            <h4 className="tag-name">{tag.charAt(0).toUpperCase() + tag.slice(1)}</h4>
+            <BlockDisplay endpoint={endpoint} tag={tag} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

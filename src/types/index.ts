@@ -1,6 +1,10 @@
 export interface RpcEndpoint {
   name: string;
   url: string;
+  // Layout grouping in the Chain Status "Block Information" section.
+  // 'primary'   → Main Node & Gateways (top layer)
+  // 'secondary' → TEE Nodes & Follower Node (second layer)
+  tier?: 'primary' | 'secondary';
 }
 
 export interface BlockInfo {

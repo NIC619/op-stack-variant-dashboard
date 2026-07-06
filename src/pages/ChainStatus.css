@@ -142,11 +142,29 @@
   }
 }
 
+.endpoints-layer {
+  margin-bottom: 2.5rem;
+}
+
+.endpoints-layer:last-child {
+  margin-bottom: 0;
+}
+
+.layer-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #4b5563;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 1rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
 .endpoints-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
   gap: 2rem;
-  margin-bottom: 2rem;
 }
 
 .endpoint-card {

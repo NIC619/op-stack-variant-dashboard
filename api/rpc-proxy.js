@@ -30,16 +30,19 @@ module.exports = async function handler(req, res) {
   // Decode the URL
   const decodedUrl = decodeURIComponent(targetUrl);
 
-  // Validate that the URL is from allowed environment variables
-  const allowedUrls = [
-    process.env.REACT_APP_GATEWAY_RPC_URL,
-    process.env.REACT_APP_MAIN_NODE_RPC_URL,
-    process.env.REACT_APP_TEE_NODE_RPC_URL,
-    process.env.REACT_APP_TEE_NODE_2_RPC_URL,
-    process.env.REACT_APP_L2_RPC_URL,
-    // Optional follower node
-    process.env.REACT_APP_FOLLOWER_NODE_RPC_URL,
-  ].filter(Boolean);
+  // Validate that the URL is from allowed environment variables. Collected
+  // dynamically so any number of gateways / TEE nodes are allowed without
+  // editing this file — set the matching Vercel env var and it's picked up.
+  // Matches REACT_APP_{GATEWAY,MAIN_NODE,TEE_NODE,FOLLOWER_NODE}_RPC_URL with an
+  // optional numeric suffix (…_2, …_3, …), e.g. REACT_APP_GATEWAY_2_RPC_URL.
+  const RPC_URL_KEY = /^REACT_APP_(GATEWAY|MAIN_NODE|TEE_NODE|FOLLOWER_NODE)(_\d+)?_RPC_URL$/;
+  const allowedUrls = Object.entries(process.env)
+    .filter(([key, value]) => value && RPC_URL_KEY.test(key))
+    .map(([, value]) => value);
+  // L2 RPC is also proxied (predeploys / L2 contract pages).
+  if (process.env.REACT_APP_L2_RPC_URL) {
+    allowedUrls.push(process.env.REACT_APP_L2_RPC_URL);
+  }
 
   if (!allowedUrls.includes(decodedUrl)) {
     console.error('URL not allowed:', decodedUrl);
