@@ -3,6 +3,7 @@ import { RPC_ENDPOINTS, getBlockByTag } from '../utils/rpc';
 import type { BlockInfo, RpcEndpoint } from '../types';
 import { RoleMonitor } from '../components/RoleMonitor';
 import { TEEProverMonitor } from '../components/TEEProverMonitor';
+import { FragStreamMonitor } from '../components/FragStreamMonitor';
 import './ChainStatus.css';
 
 const BLOCK_TAGS = ['latest', 'safe', 'finalized'] as const;
@@ -81,6 +82,11 @@ export default function ChainStatusPage() {
             </div>
           )}
         </div>
+        {/* Frag Stream health. Deliberately NOT inside the refreshKey-keyed
+            div: remounting would wipe the "last seen" history the aggregate
+            banner relies on. refreshKey is passed as a prop instead, which
+            starts a new bounded probing burst. */}
+        <FragStreamMonitor refreshKey={refreshKey} />
       </div>
 
       {/* Role Monitoring Section */}
