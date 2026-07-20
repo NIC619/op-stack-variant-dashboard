@@ -1,0 +1,131 @@
+/* Frag Stream section — sits inside the Block Information section on
+   ChainStatus, mirroring the endpoints-grid look with smaller tiles. */
+
+/* The preceding endpoints-layer is the :last-child of the keyed wrapper div
+   (margin-bottom 0), so this section provides its own top spacing. */
+.frag-stream-section {
+  margin-top: 2.5rem;
+}
+
+.frag-banner {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+}
+
+.frag-banner-checking {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.frag-banner-healthy {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.frag-banner-warming {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.frag-banner-down {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.frag-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.frag-tile {
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.frag-tile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
+.frag-tile-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.frag-tile-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.frag-tile-streaming .frag-tile-status-dot {
+  background-color: #10b981;
+}
+
+.frag-tile-idle .frag-tile-status-dot {
+  background-color: #f59e0b;
+}
+
+.frag-tile-error .frag-tile-status-dot {
+  background-color: #ef4444;
+}
+
+.frag-tile-url {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0 0 0.75rem 0;
+  word-break: break-all;
+  font-family: 'Courier New', monospace;
+}
+
+.frag-tile-status {
+  font-size: 0.875rem;
+  margin: 0 0 0.75rem 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.frag-tile-streaming .frag-tile-status {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.frag-tile-idle .frag-tile-status {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.frag-tile-error .frag-tile-status {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.frag-tile-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.frag-note {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin: 0.75rem 0 0 0;
+}

@@ -38,7 +38,7 @@ function getRpcUrl(originalUrl: string): string {
 // React App inlines env vars at build time via a static find-and-replace, so
 // dynamic keys (process.env[`…${i}…`]) do NOT work in the browser bundle. To add
 // more capacity, append a line here AND set the matching var in .env / Vercel.
-const GATEWAY_RPC_URLS = [
+export const GATEWAY_RPC_URLS = [
   process.env.REACT_APP_GATEWAY_RPC_URL,
   process.env.REACT_APP_GATEWAY_2_RPC_URL,
   process.env.REACT_APP_GATEWAY_3_RPC_URL,
