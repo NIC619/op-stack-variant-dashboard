@@ -85,7 +85,7 @@ export default function ChainStatusPage() {
         {/* Frag Stream health. Deliberately NOT inside the refreshKey-keyed
             div: remounting would wipe the "last seen" history the aggregate
             banner relies on. refreshKey is passed as a prop instead, which
-            triggers an immediate re-probe. */}
+            starts a new bounded probing burst. */}
         <FragStreamMonitor refreshKey={refreshKey} />
       </div>
 

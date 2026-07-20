@@ -7,7 +7,8 @@ import {
 import type { FragGateway, FragProbeResult } from '../utils/fragHealth';
 import './FragStreamMonitor.css';
 
-// Re-probe cadence. Each probe itself listens for PROBE_WINDOW_MS (~5s).
+// Re-probe cadence within a burst. Each probe itself listens for
+// PROBE_WINDOW_MS (~5s).
 const POLL_INTERVAL_MS = 15000;
 
 // A gateway only builds frags during its own ~30-block (~60s) epoch, so a
@@ -17,6 +18,18 @@ const POLL_INTERVAL_MS = 15000;
 // frag stream is down. Window > one epoch to span rotation boundaries.
 const HEALTHY_WINDOW_MS = 90000;
 
+// Probing runs as a bounded burst instead of polling forever: on page open
+// and on each manual Refresh, poll every POLL_INTERVAL_MS until the full
+// HEALTHY_WINDOW_MS is covered, freeze the verdict, and stop. This caps
+// serverless-function usage per visit while still giving the red banner a
+// full epoch-safe evidence window. Rounds at t=0, 15s, …, 90s.
+const BURST_ROUNDS = Math.floor(HEALTHY_WINDOW_MS / POLL_INTERVAL_MS) + 1;
+// The verdict freezes as soon as the final round's probes settle. This is
+// only a backstop for a lost/hung request: the serverless probe may run up to
+// ~9s (connect + observe budget) before network overhead, so the cap sits
+// above that.
+const BURST_SETTLE_TIMEOUT_MS = 12000;
+
 interface GatewayFragState {
   checking: boolean;
   result?: FragProbeResult;
@@ -25,13 +38,19 @@ interface GatewayFragState {
   lastSeenAt?: number;
 }
 
+// One probing burst: startedAt is set when the burst begins (page open or
+// Refresh click); endedAt is set once the final round has settled, freezing
+// the verdict until the next burst.
+interface Burst {
+  startedAt: number;
+  endedAt?: number;
+}
+
 export function FragStreamMonitor({ refreshKey }: { refreshKey: number }) {
   const [states, setStates] = useState<Record<string, GatewayFragState>>({});
   // Ticks every second so "Xs ago" labels and the aggregate window stay live.
   const [now, setNow] = useState(() => Date.now());
-  // When monitoring started. The outage banner claims "no frags in the last
-  // 90s", so it must not appear until we have actually observed that long.
-  const [monitoringSince] = useState(() => Date.now());
+  const [burst, setBurst] = useState<Burst>(() => ({ startedAt: Date.now() }));
 
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 1000);
@@ -40,15 +59,22 @@ export function FragStreamMonitor({ refreshKey }: { refreshKey: number }) {
 
   useEffect(() => {
     let cancelled = false;
+    // Set when the verdict freezes. Probe results arriving after this point
+    // are dropped: letting them through would mutate the frozen verdict and
+    // could stamp a lastSeenAt newer than the frozen evalNow (negative age).
+    let frozen = false;
+    let settleTimer: ReturnType<typeof setTimeout> | undefined;
+    const startedAt = Date.now();
+    setBurst({ startedAt });
 
-    const runProbes = () => {
-      FRAG_GATEWAYS.forEach(gateway => {
+    const runProbes = (): Array<Promise<void>> =>
+      FRAG_GATEWAYS.map(gateway => {
         setStates(prev => ({
           ...prev,
           [gateway.wsUrl]: { ...prev[gateway.wsUrl], checking: true },
         }));
-        probeFragStream(gateway.wsUrl).then(result => {
-          if (cancelled) return;
+        return probeFragStream(gateway.wsUrl).then(result => {
+          if (cancelled || frozen) return;
           const checkedAt = Date.now();
           setStates(prev => ({
             ...prev,
@@ -61,13 +87,41 @@ export function FragStreamMonitor({ refreshKey }: { refreshKey: number }) {
           }));
         });
       });
+
+    // Freeze once the final round's probes have settled (or the backstop
+    // timeout fires because a request was lost). Any tile still marked
+    // checking at that point had its request dropped — clear the flag so it
+    // doesn't spin forever; its previous result stays displayed.
+    const freeze = () => {
+      if (cancelled || frozen) return;
+      frozen = true;
+      clearTimeout(settleTimer);
+      setStates(prev => {
+        const next = { ...prev };
+        for (const url of Object.keys(next)) {
+          if (next[url].checking) next[url] = { ...next[url], checking: false };
+        }
+        return next;
+      });
+      setBurst({ startedAt, endedAt: Date.now() });
     };
 
     runProbes();
-    const interval = setInterval(runProbes, POLL_INTERVAL_MS);
+    let round = 1;
+    const interval = setInterval(() => {
+      round += 1;
+      const promises = runProbes();
+      if (round >= BURST_ROUNDS) {
+        clearInterval(interval);
+        settleTimer = setTimeout(freeze, BURST_SETTLE_TIMEOUT_MS);
+        Promise.allSettled(promises).then(freeze);
+      }
+    }, POLL_INTERVAL_MS);
+
     return () => {
       cancelled = true;
       clearInterval(interval);
+      if (settleTimer) clearTimeout(settleTimer);
     };
   }, [refreshKey]);
 
@@ -84,7 +138,12 @@ export function FragStreamMonitor({ refreshKey }: { refreshKey: number }) {
   const allInitialProbed =
     gatewayStates.length === FRAG_GATEWAYS.length &&
     gatewayStates.every(s => s.lastCheckedAt !== undefined);
-  const observedMs = now - monitoringSince;
+  // Once the burst ends the verdict is frozen at burst end: probing has
+  // stopped, so letting `now` keep advancing would decay a green verdict into
+  // a false red purely from the passage of unobserved time.
+  const paused = burst.endedAt !== undefined;
+  const evalNow = burst.endedAt ?? now;
+  const observedMs = evalNow - burst.startedAt;
   const lastSeenAny = gatewayStates.reduce<number | undefined>(
     (max, s) =>
       s.lastSeenAt !== undefined && (max === undefined || s.lastSeenAt > max)
@@ -93,7 +152,7 @@ export function FragStreamMonitor({ refreshKey }: { refreshKey: number }) {
     undefined,
   );
   const aggregateHealthy =
-    lastSeenAny !== undefined && now - lastSeenAny <= HEALTHY_WINDOW_MS;
+    lastSeenAny !== undefined && evalNow - lastSeenAny <= HEALTHY_WINDOW_MS;
 
   return (
     <div className="endpoints-layer frag-stream-section">
@@ -102,7 +161,7 @@ export function FragStreamMonitor({ refreshKey }: { refreshKey: number }) {
       {aggregateHealthy ? (
         <div className="frag-banner frag-banner-healthy">
           ✅ Frag stream healthy — at least one gateway emitted frags in the last{' '}
-          {formatAge(now - (lastSeenAny as number))}
+          {formatAge(evalNow - (lastSeenAny as number))}
         </div>
       ) : !allInitialProbed ? (
         <div className="frag-banner frag-banner-checking">
@@ -118,6 +177,13 @@ export function FragStreamMonitor({ refreshKey }: { refreshKey: number }) {
           🚨 No frags seen from any gateway in the last{' '}
           {Math.round(HEALTHY_WINDOW_MS / 1000)}s — the frag stream may be down
         </div>
+      )}
+
+      {paused && (
+        <p className="frag-paused">
+          Monitoring paused — verdict from {formatAge(now - evalNow)} ago. Press
+          🔄 Refresh to re-check.
+        </p>
       )}
 
       <div className="frag-grid">
