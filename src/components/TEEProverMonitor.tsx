@@ -54,6 +54,10 @@ interface ProverHealth {
   hashMatch: boolean | null;
   /** Whether that proof would be ACCEPTED by the registry. null = could not be determined. */
   verifiesOnChain: boolean | null;
+  /** Sync position, as observed by the prober — the prover need not be reachable from here. */
+  headBlock: number | null;
+  safeBlock: number | null;
+  /** sequencerHead - proverHead. 0 means level with the sequencer. */
   headLagBlocks: number | null;
   lastProbeAgeSeconds: number | null;
 }
@@ -61,8 +65,14 @@ interface ProverHealth {
 interface HealthResponse {
   ok: boolean;
   stale: boolean;
+  /** The reference head every prover's lag is measured against. */
+  sequencerHeadBlock: number | null;
   provers: ProverHealth[];
 }
+
+/** A prover trails the sequencer by a block or two in normal operation; only a sustained
+ *  gap means it is actually falling behind. */
+const SYNC_TOLERANCE_BLOCKS = 5;
 
 interface TEEProofResult {
   proof: `0x${string}`;
@@ -174,6 +184,7 @@ export function TEEProverMonitor({
     error: null,
   });
 
+  const [sequencerHead, setSequencerHead] = useState<number | null>(null);
   const [teeRpcStatuses, setTeeRpcStatuses] = useState<TEERpcStatus[]>(
     teeNodes.map(() => ({ ok: false, loading: true, error: null }))
   );
@@ -366,6 +377,7 @@ export function TEEProverMonitor({
       if (healthUrl) {
         try {
           const health = await fetchProverHealth(healthUrl);
+          setSequencerHead(health.sequencerHeadBlock ?? null);
           setTeeRpcStatuses(
             health.provers.map((p) => ({
               // Answering is not the same as being usable: a prover with a deregistered
@@ -619,9 +631,27 @@ export function TEEProverMonitor({
                       </span>
                     </div>
                     <div className="status-item">
-                      <span className="status-label">Head lag:</span>
+                      <span className="status-label">In sync:</span>
                       <span className="status-value">
-                        {status.health.headLagBlocks ?? '—'} blocks
+                        {status.health.headLagBlocks === null ? (
+                          <span style={{ color: '#a0aec0' }}>unknown</span>
+                        ) : status.health.headLagBlocks <= SYNC_TOLERANCE_BLOCKS ? (
+                          <span style={{ color: '#38a169', fontWeight: 600 }}>
+                            ✓ level with the sequencer
+                          </span>
+                        ) : (
+                          <span style={{ color: '#e53e3e', fontWeight: 600 }}>
+                            ✗ {status.health.headLagBlocks} blocks behind
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="status-item">
+                      <span className="status-label">Heads:</span>
+                      <span className="status-value">
+                        latest {status.health.headBlock ?? '—'} · safe{' '}
+                        {status.health.safeBlock ?? '—'}
+                        {sequencerHead !== null && ` · sequencer ${sequencerHead}`}
                         {status.health.lastProbeAgeSeconds !== null &&
                           ` · probed ${status.health.lastProbeAgeSeconds}s ago`}
                       </span>
