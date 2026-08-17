@@ -174,6 +174,11 @@ export function TEEProverMonitor({
       : null,
   ].filter((n): n is TEENode => n !== null);
 
+  // A health endpoint is a prover source in its own right. Gating on teeNodes alone hid this
+  // panel entirely once the node URLs were unset for provers that are deliberately not
+  // public — which is exactly the deployment the health endpoint exists to serve.
+  const hasProverSource = teeNodes.length > 0 || Boolean(process.env.REACT_APP_TEE_HEALTH_URL);
+
   const [blockProcessedStatus, setBlockProcessedStatus] = useState<BlockProcessedStatus>({
     timestamp: null,
     blockNumber: null,
@@ -194,7 +199,7 @@ export function TEEProverMonitor({
   useEffect(() => {
     const disputeGameFactoryAddress = process.env.REACT_APP_L1_DISPUTE_GAME_FACTORY_ADDRESS;
 
-    if (!disputeGameFactoryAddress || teeNodes.length === 0) {
+    if (!disputeGameFactoryAddress || !hasProverSource) {
       return;
     }
 
@@ -500,7 +505,7 @@ export function TEEProverMonitor({
 
   const disputeGameFactoryAddress = process.env.REACT_APP_L1_DISPUTE_GAME_FACTORY_ADDRESS;
 
-  if (!disputeGameFactoryAddress || teeNodes.length === 0) {
+  if (!disputeGameFactoryAddress || !hasProverSource) {
     return null;
   }
 
@@ -520,7 +525,11 @@ export function TEEProverMonitor({
         <div className="role-status error">
           {blockProcessedStatus.error && <div>BlockProcessed: {blockProcessedStatus.error}</div>}
           {teeRpcStatuses.map((status, idx) => (
-            status.error && <div key={idx}>{teeNodes[idx].name} RPC: {status.error}</div>
+            status.error && (
+              <div key={idx}>
+                {teeRpcStatuses[idx]?.health?.name ?? teeNodes[idx]?.name ?? `TEE Node ${idx + 1}`} RPC: {status.error}
+              </div>
+            )
           ))}
         </div>
       ) : (

@@ -20,6 +20,12 @@ const PROPOSER_ADDRESS = process.env.REACT_APP_PROPOSER_ADDRESS || '';
 const DISPUTE_GAME_FACTORY_ADDRESS = process.env.REACT_APP_L1_DISPUTE_GAME_FACTORY_ADDRESS || '';
 const TEE_NODE_RPC_URL = process.env.REACT_APP_TEE_NODE_RPC_URL || '';
 const TEE_NODE_2_RPC_URL = process.env.REACT_APP_TEE_NODE_2_RPC_URL || '';
+const TEE_HEALTH_URL = process.env.REACT_APP_TEE_HEALTH_URL || '';
+// The panel needs A source of prover data, not specifically a directly reachable prover.
+// Keying its visibility on the node URLs alone hid it entirely once those were unset for
+// provers that are deliberately not public — which is the configuration the health endpoint
+// exists to serve.
+const HAS_PROVER_SOURCE = Boolean(TEE_HEALTH_URL || TEE_NODE_RPC_URL || TEE_NODE_2_RPC_URL);
 
 // Warning thresholds
 const BATCHER_ACTIVITY_THRESHOLDS = [5, 30, 60, 240, 720, 1440]; // minutes (Batcher)
@@ -97,7 +103,7 @@ export default function ChainStatusPage() {
             <strong>Missing Role Addresses:</strong> Please configure REACT_APP_BATCHER_ADDRESS and REACT_APP_PROPOSER_ADDRESS in your .env file.
           </div>
         )}
-        {(BATCHER_ADDRESS || PROPOSER_ADDRESS || (DISPUTE_GAME_FACTORY_ADDRESS && (TEE_NODE_RPC_URL || TEE_NODE_2_RPC_URL))) && (
+        {(BATCHER_ADDRESS || PROPOSER_ADDRESS || (DISPUTE_GAME_FACTORY_ADDRESS && HAS_PROVER_SOURCE)) && (
           <div className="roles-grid">
             {BATCHER_ADDRESS && (
               <RoleMonitor
@@ -115,7 +121,7 @@ export default function ChainStatusPage() {
                 balanceThresholds={BALANCE_THRESHOLDS}
               />
             )}
-            {DISPUTE_GAME_FACTORY_ADDRESS && (TEE_NODE_RPC_URL || TEE_NODE_2_RPC_URL) && (
+            {DISPUTE_GAME_FACTORY_ADDRESS && HAS_PROVER_SOURCE && (
               <TEEProverMonitor
                 activityThresholds={TEE_ACTIVITY_THRESHOLDS}
               />
