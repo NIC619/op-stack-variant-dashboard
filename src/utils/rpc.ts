@@ -8,9 +8,10 @@ if (!process.env.REACT_APP_GATEWAY_RPC_URL) {
 if (!process.env.REACT_APP_MAIN_NODE_RPC_URL) {
   throw new Error('REACT_APP_MAIN_NODE_RPC_URL is not set. Please configure it in your .env file.');
 }
-if (!process.env.REACT_APP_TEE_NODE_RPC_URL) {
-  throw new Error('REACT_APP_TEE_NODE_RPC_URL is not set. Please configure it in your .env file.');
-}
+// REACT_APP_TEE_NODE_* is deliberately OPTIONAL. Provers are not required to be publicly
+// reachable — where they are not, their block heads come from the monitoring stack via the
+// TEE Prover panel instead, and leaving these unset simply omits their cards here rather
+// than rendering ones that can never load.
 
 // Helper function to get the RPC URL (use proxy in production for IP addresses)
 function getRpcUrl(originalUrl: string): string {
