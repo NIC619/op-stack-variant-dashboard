@@ -133,7 +133,18 @@ function fetchTEEProof(rpcUrl: string): Promise<TEEProofResult> {
  * rather than repeating its last values, and this treats that as an error.
  */
 async function fetchProverHealth(url: string): Promise<HealthResponse> {
-  const response = await fetch(url, { headers: { Accept: 'application/json' } });
+  // The monitoring stack serves plain HTTP on a raw IP. A browser on the HTTPS deployment
+  // blocks that as mixed content and the fetch rejects with a bare "Failed to fetch", so on
+  // Vercel we go through the serverless proxy instead — the same treatment getRpcUrl() gives
+  // raw-IP RPC URLs, and for the same reason. Direct elsewhere, so local development against
+  // a reachable monitor keeps working.
+  const isVercel =
+    typeof window !== 'undefined' &&
+    (window.location.hostname.includes('vercel.app') ||
+      window.location.hostname.includes('vercel.com'));
+  const target = isVercel && /^http:\/\//.test(url) ? '/api/tee-health' : url;
+
+  const response = await fetch(target, { headers: { Accept: 'application/json' } });
   const body = (await response.json()) as HealthResponse & { error?: string };
   if (!response.ok) {
     throw new Error(body.error || (body.stale ? 'Health data is stale' : `HTTP ${response.status}`));
