@@ -43,6 +43,25 @@ interface TEERpcStatus {
   error: string | null;
   decoded?: DecodedProofStatus;
   decodeError?: string;
+  /** Set only on the health-endpoint path — see fetchProverHealth. */
+  health?: ProverHealth;
+}
+
+/** One prover as reported by the monitoring stack's /health endpoint. */
+interface ProverHealth {
+  name: string;
+  proofProbe: boolean | null;
+  hashMatch: boolean | null;
+  /** Whether that proof would be ACCEPTED by the registry. null = could not be determined. */
+  verifiesOnChain: boolean | null;
+  headLagBlocks: number | null;
+  lastProbeAgeSeconds: number | null;
+}
+
+interface HealthResponse {
+  ok: boolean;
+  stale: boolean;
+  provers: ProverHealth[];
 }
 
 interface TEEProofResult {
@@ -94,6 +113,32 @@ function fetchTEEProof(rpcUrl: string): Promise<TEEProofResult> {
     }
     return result as TEEProofResult;
   });
+}
+
+/**
+ * Prover health from the monitoring stack, instead of querying provers directly.
+ *
+ * The provers are not reachable from here any more, and deliberately so: they run op-geth
+ * with the admin and debug namespaces enabled, so exposing their RPC to serve a health check
+ * meant leaving a debug_setHead-capable port open to the internet. Polling them also made a
+ * production prover do real signing work on every page, per open tab.
+ *
+ * What comes back is a stronger signal than this component used to compute. The prober probes
+ * at the SAFE HEAD and cross-checks the returned hash against the sequencer — catching a
+ * forked prover, which proving block 1 never could — and it asks the registry whether that
+ * exact proof would be ACCEPTED, which covers signer recovery, instance expiry and golden
+ * measurement registration in one answer.
+ *
+ * A stalled monitor is reported, never disguised: the endpoint returns 503 with stale=true
+ * rather than repeating its last values, and this treats that as an error.
+ */
+async function fetchProverHealth(url: string): Promise<HealthResponse> {
+  const response = await fetch(url, { headers: { Accept: 'application/json' } });
+  const body = (await response.json()) as HealthResponse & { error?: string };
+  if (!response.ok) {
+    throw new Error(body.error || (body.stale ? 'Health data is stale' : `HTTP ${response.status}`));
+  }
+  return body;
 }
 
 export function TEEProverMonitor({
@@ -304,6 +349,34 @@ export function TEEProverMonitor({
     };
 
     const fetchTEERpcAll = async () => {
+      // Preferred path. Falls through to the direct prover call below when unset, which keeps
+      // local development and any environment where provers ARE reachable working unchanged.
+      const healthUrl = process.env.REACT_APP_TEE_HEALTH_URL;
+      if (healthUrl) {
+        try {
+          const health = await fetchProverHealth(healthUrl);
+          setTeeRpcStatuses(
+            health.provers.map((p) => ({
+              // Answering is not the same as being usable: a prover with a deregistered
+              // measurement signs perfectly well and is still worthless on chain. Only an
+              // explicit false is a fault — null means the check could not be run.
+              ok: Boolean(p.proofProbe) && Boolean(p.hashMatch) && p.verifiesOnChain !== false,
+              loading: false,
+              error: null,
+              health: p,
+            })),
+          );
+        } catch (error) {
+          console.error('Error fetching prover health:', error);
+          setTeeRpcStatuses([{
+            ok: false,
+            loading: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          }]);
+        }
+        return;
+      }
+
       const results = await Promise.all(
         teeNodes.map(async (node): Promise<TEERpcStatus> => {
           try {
@@ -478,13 +551,15 @@ export function TEEProverMonitor({
             )}
           </div>
 
-          {/* Per-node TEE RPC Status */}
-          {teeNodes.map((node, idx) => {
-            const status = teeRpcStatuses[idx];
-            if (!status) return null;
+          {/* Per-node TEE RPC Status. Driven by the statuses rather than by teeNodes: on the
+              health-endpoint path the list comes from the monitoring stack, so its length and
+              names need not match the configured node list. */}
+          {teeRpcStatuses.map((status, idx) => {
+            const node = teeNodes[idx];
+            const label = status.health?.name ?? node?.name ?? `TEE Node ${idx + 1}`;
             return (
-              <div className="status-section" key={node.url}>
-                <h4>{node.name} Prover Service</h4>
+              <div className="status-section" key={status.health?.name ?? node?.url ?? idx}>
+                <h4>{label} Prover Service</h4>
                 <div className="status-item">
                   <span className="status-label">Status:</span>
                   <span className="status-value">
@@ -499,6 +574,48 @@ export function TEEProverMonitor({
                   <div className="role-status error" style={{ marginTop: '12px', padding: '12px' }}>
                     {status.error}
                   </div>
+                )}
+                {status.health && (
+                  <>
+                    <div className="status-item">
+                      <span className="status-label">Proof probe:</span>
+                      <span className="status-value">
+                        {status.health.proofProbe && status.health.hashMatch ? (
+                          <span style={{ color: '#38a169', fontWeight: 600 }}>
+                            ✓ answering, matches sequencer
+                          </span>
+                        ) : (
+                          <span style={{ color: '#e53e3e', fontWeight: 600 }}>
+                            ✗ {status.health.proofProbe ? 'hash mismatch — forked?' : 'no proof returned'}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="status-item">
+                      <span className="status-label">Accepted on chain:</span>
+                      <span className="status-value">
+                        {status.health.verifiesOnChain === true && (
+                          <span style={{ color: '#38a169', fontWeight: 600 }}>✓ verifyProof passes</span>
+                        )}
+                        {status.health.verifiesOnChain === false && (
+                          <span style={{ color: '#e53e3e', fontWeight: 600 }}>
+                            ✗ registry rejects this proof
+                          </span>
+                        )}
+                        {status.health.verifiesOnChain === null && (
+                          <span style={{ color: '#a0aec0' }}>unknown — L1 read failed</span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="status-item">
+                      <span className="status-label">Head lag:</span>
+                      <span className="status-value">
+                        {status.health.headLagBlocks ?? '—'} blocks
+                        {status.health.lastProbeAgeSeconds !== null &&
+                          ` · probed ${status.health.lastProbeAgeSeconds}s ago`}
+                      </span>
+                    </div>
+                  </>
                 )}
                 <SignedProofBlock status={status} />
               </div>
