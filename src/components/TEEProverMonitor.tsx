@@ -10,6 +10,7 @@ import {
 } from '../utils/teeProof';
 import { getProverInstance, getRegistryChainId } from '../utils/proverRegistry';
 import './RoleMonitor.css';
+import { isLocalDev } from '../utils/env';
 
 interface TEEProverMonitorProps {
   activityThresholds: number[]; // in minutes
@@ -91,14 +92,15 @@ interface TEENode {
 }
 
 function fetchTEEProof(rpcUrl: string): Promise<TEEProofResult> {
-  const isVercel = typeof window !== 'undefined' &&
-    (window.location.hostname.includes('vercel.app') ||
-     window.location.hostname.includes('vercel.com'));
-
-  let targetUrl = rpcUrl;
-  if (isVercel && /^http:\/\/\d+\.\d+\.\d+\.\d+:\d+/.test(rpcUrl)) {
-    targetUrl = window.location.origin + '/api/rpc-proxy?url=' + encodeURIComponent(rpcUrl);
-  }
+  // Same resolution rule as getRpcUrl() in utils/rpc.ts, and for the same reason: in any
+  // production build EVERY prover URL goes through the proxy, not just raw http://IP:port
+  // ones. An https:// hostname fails too — these are op-geth nodes behind nginx, and the
+  // application/json body forces a CORS preflight that geth answers with a 400 "Parse
+  // error" and no Access-Control-* headers, so the browser blocks the POST and viem
+  // reports a bare "Failed to fetch".
+  const targetUrl = isLocalDev()
+    ? rpcUrl
+    : window.location.origin + '/api/rpc-proxy?url=' + encodeURIComponent(rpcUrl);
 
   return fetch(targetUrl, {
     method: 'POST',
@@ -144,15 +146,11 @@ function fetchTEEProof(rpcUrl: string): Promise<TEEProofResult> {
  */
 async function fetchProverHealth(url: string): Promise<HealthResponse> {
   // The monitoring stack serves plain HTTP on a raw IP. A browser on the HTTPS deployment
-  // blocks that as mixed content and the fetch rejects with a bare "Failed to fetch", so on
-  // Vercel we go through the serverless proxy instead — the same treatment getRpcUrl() gives
-  // raw-IP RPC URLs, and for the same reason. Direct elsewhere, so local development against
-  // a reachable monitor keeps working.
-  const isVercel =
-    typeof window !== 'undefined' &&
-    (window.location.hostname.includes('vercel.app') ||
-      window.location.hostname.includes('vercel.com'));
-  const target = isVercel && /^http:\/\//.test(url) ? '/api/tee-health' : url;
+  // blocks that as mixed content and the fetch rejects with a bare "Failed to fetch", so any
+  // production build goes through the serverless proxy instead — the same treatment
+  // getRpcUrl() gives RPC URLs, and for the same reason. Direct only in local dev, so
+  // development against a reachable monitor keeps working.
+  const target = isLocalDev() ? url : '/api/tee-health';
 
   const response = await fetch(target, { headers: { Accept: 'application/json' } });
   const body = (await response.json()) as HealthResponse & { error?: string };

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPublicClient, http, formatEther } from 'viem';
 import { getL1RpcUrl } from '../utils/contracts';
 import './RoleMonitor.css';
+import { isLocalDev } from '../utils/env';
 
 interface RoleMonitorProps {
   roleName: string;
@@ -44,10 +45,10 @@ export function RoleMonitor({
           // Get chain ID from RPC
           const chainId = await client.getChainId();
 
-          // Use proxy on Vercel to keep API key server-side (never expose in client bundle)
-          // In local dev, serverless functions don't work, so we'll try the proxy first
-          // and fall back gracefully if it fails
-          
+          // Deployed builds go through /api/explorer-proxy, which holds the API key
+          // server-side so it never reaches the client bundle. Local dev has no
+          // serverless runtime, so it calls the explorer directly with the
+          // REACT_APP_ key instead.
           // Build query parameters
           const params = new URLSearchParams({
             chainid: chainId.toString(),
@@ -61,22 +62,18 @@ export function RoleMonitor({
             sort: 'desc',
           });
 
-          // Check if we're on Vercel
-          const isVercel = typeof window !== 'undefined' && 
-            (window.location.hostname.includes('vercel.app') || 
-             window.location.hostname.includes('vercel.com'));
-
           let apiEndpoint: string;
-          if (isVercel && typeof window !== 'undefined') {
-            // On Vercel: use proxy with L1_EXPLORER_API_KEY (server-side only, never in bundle)
-            apiEndpoint = `${window.location.origin}/api/explorer-proxy?${params}`;
-          } else {
+          if (isLocalDev()) {
             // Local dev: use REACT_APP_L1_EXPLORER_API_KEY directly (will be in bundle, but that's OK for dev)
             const explorerApiKey = process.env.REACT_APP_L1_EXPLORER_API_KEY || '';
             if (explorerApiKey) {
               params.append('apikey', explorerApiKey);
             }
             apiEndpoint = `${explorerApiUrl}?${params}`;
+          } else {
+            // Any deployed build: use the proxy, which holds L1_EXPLORER_API_KEY server-side
+            // so the key never reaches the client bundle.
+            apiEndpoint = `${window.location.origin}/api/explorer-proxy?${params}`;
           }
 
           const response = await fetch(apiEndpoint);
