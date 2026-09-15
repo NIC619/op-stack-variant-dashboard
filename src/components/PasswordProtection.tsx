@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { isLocalDev } from '../utils/env';
 import './PasswordProtection.css';
 
 interface PasswordProtectionProps {
@@ -11,14 +12,14 @@ export default function PasswordProtection({ children }: PasswordProtectionProps
   const [error, setError] = useState('');
   const [isChecking, setIsChecking] = useState(true);
 
-  // Check if we're on Vercel (production) or local development
-  const isVercel = typeof window !== 'undefined' && 
-    (window.location.hostname.includes('vercel.app') || 
-     window.location.hostname.includes('vercel.com'));
+  // The gate runs on every deployed build, local dev only is exempt. Whether a password is
+  // actually required is decided server-side by /api/auth: with ACCESS_PASSWORD unset it
+  // accepts anything, so a deployment that has not configured one is not locked out.
+  const gated = !isLocalDev();
 
   useEffect(() => {
     // Skip password protection in local development
-    if (!isVercel) {
+    if (!gated) {
       setIsAuthenticated(true);
       setIsChecking(false);
       return;
@@ -30,7 +31,7 @@ export default function PasswordProtection({ children }: PasswordProtectionProps
       setIsAuthenticated(true);
     }
     setIsChecking(false);
-  }, [isVercel]);
+  }, [gated]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,14 +39,10 @@ export default function PasswordProtection({ children }: PasswordProtectionProps
 
     try {
       // Verify password via serverless function (password never exposed in client bundle)
-      const isVercel = typeof window !== 'undefined' && 
-        (window.location.hostname.includes('vercel.app') || 
-         window.location.hostname.includes('vercel.com'));
-
       let authenticated = false;
 
-      if (isVercel) {
-        // On Vercel: verify password server-side
+      if (!isLocalDev()) {
+        // Any deployed build: verify the password server-side
         const response = await fetch(`${window.location.origin}/api/auth`, {
           method: 'POST',
           headers: {
@@ -91,7 +88,7 @@ export default function PasswordProtection({ children }: PasswordProtectionProps
   }
 
   // Skip password protection in local development
-  if (!isVercel) {
+  if (!gated) {
     return <>{children}</>;
   }
 

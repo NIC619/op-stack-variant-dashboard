@@ -10,6 +10,7 @@ import {
 } from '../utils/teeProof';
 import { getProverInstance, getRegistryChainId } from '../utils/proverRegistry';
 import './RoleMonitor.css';
+import { isLocalDev } from '../utils/env';
 
 interface TEEProverMonitorProps {
   activityThresholds: number[]; // in minutes
@@ -83,14 +84,6 @@ interface TEEProofResult {
     parentHash: `0x${string}`;
     timestamp: number;
   };
-}
-
-// Local dev (CRA dev server) can talk to these endpoints directly; any production build is
-// served over HTTPS and must go through the serverless proxies. Keyed off NODE_ENV rather
-// than a vercel.app hostname check so a custom domain counts as production too — same
-// reasoning as isLocalDev() in utils/fragHealth.ts and getRpcUrl() in utils/rpc.ts.
-function isLocalDev(): boolean {
-  return process.env.NODE_ENV === 'development';
 }
 
 interface TEENode {

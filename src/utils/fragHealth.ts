@@ -1,4 +1,5 @@
 import { GATEWAY_RPC_URLS } from './rpc';
+import { isLocalDev } from './env';
 
 // Frag-stream health probing for the ChainStatus "Frag Stream" section.
 //
@@ -63,12 +64,9 @@ export const FRAG_GATEWAYS: FragGateway[] = GATEWAY_RPC_URLS.map((rpcUrl, i) => 
 }).filter((g): g is FragGateway => g !== null);
 
 // Direct ws:// probing is only viable from the CRA dev server (http:// origin,
-// no serverless runtime). Any production build — vercel.app, vercel.com, or a
-// custom domain — is served over HTTPS where a raw ws://IP:9999 is
-// mixed-content blocked, so it must go through /api/frag-health.
-function isLocalDev(): boolean {
-  return process.env.NODE_ENV === 'development';
-}
+// no serverless runtime). Any production build is served over HTTPS where a raw
+// ws://IP:9999 is mixed-content blocked, so it must go through /api/frag-health
+// — hence isLocalDev() rather than a hostname check.
 
 // Connection timeout for the dev direct probe. Mirrors CONNECT_TIMEOUT_MS in
 // api/frag-health.js: a socket that never opens is a transport failure, not

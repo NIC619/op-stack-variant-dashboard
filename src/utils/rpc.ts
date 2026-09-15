@@ -1,5 +1,6 @@
 import { createPublicClient, http } from 'viem';
 import type { BlockInfo, RpcEndpoint } from '../types';
+import { isLocalDev } from './env';
 
 // Validate required RPC endpoint environment variables
 if (!process.env.REACT_APP_GATEWAY_RPC_URL) {
@@ -25,11 +26,10 @@ if (!process.env.REACT_APP_MAIN_NODE_RPC_URL) {
 // both, and the URL must be set in the matching Vercel env var to pass its
 // allowlist (see api/rpc-proxy.js).
 //
-// Keyed off NODE_ENV rather than a vercel.app hostname check, so a deployment on
-// a custom domain is treated as production too — same reasoning as isLocalDev()
-// in utils/fragHealth.ts.
+// isLocalDev() rather than a vercel.app hostname check, so a deployment on a
+// custom domain is treated as production too.
 function getRpcUrl(originalUrl: string): string {
-  if (process.env.NODE_ENV === 'development') return originalUrl;
+  if (isLocalDev()) return originalUrl;
   return '/api/rpc-proxy?url=' + encodeURIComponent(originalUrl);
 }
 
