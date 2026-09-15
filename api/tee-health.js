@@ -2,8 +2,8 @@
 //
 // The dashboard is served over HTTPS and the monitoring stack serves plain HTTP on a raw IP,
 // so the browser blocks a direct fetch as mixed content — which surfaces as a bare
-// "Failed to fetch" with no detail. src/utils/rpc.ts already proxies raw-IP RPC URLs on
-// Vercel for exactly this reason; this is the same treatment for the health endpoint.
+// "Failed to fetch" with no detail. src/utils/rpc.ts already proxies RPC URLs in production
+// builds for exactly this reason; this is the same treatment for the health endpoint.
 //
 // Fetching it here also keeps the monitor's address out of the client bundle when
 // TEE_HEALTH_URL_SECRET is used, matching how api/l1-rpc.js handles the L1 upstream.

@@ -13,22 +13,24 @@ if (!process.env.REACT_APP_MAIN_NODE_RPC_URL) {
 // TEE Prover panel instead, and leaving these unset simply omits their cards here rather
 // than rendering ones that can never load.
 
-// Helper function to get the RPC URL (use proxy in production for IP addresses)
+// Resolve an endpoint URL for the browser: direct in local dev, through
+// /api/rpc-proxy in any production build.
+//
+// EVERY endpoint is proxied in production, not just raw http://IP:port ones. An
+// https:// hostname is no safer to call directly: these are op-geth nodes behind
+// nginx, and viem's application/json body forces a CORS preflight that geth
+// answers with a 400 "Parse error" and no Access-Control-* headers — the browser
+// then blocks the POST that would have succeeded, surfacing only "Failed to
+// fetch". Raw IP endpoints additionally fail as mixed content. The proxy fixes
+// both, and the URL must be set in the matching Vercel env var to pass its
+// allowlist (see api/rpc-proxy.js).
+//
+// Keyed off NODE_ENV rather than a vercel.app hostname check, so a deployment on
+// a custom domain is treated as production too — same reasoning as isLocalDev()
+// in utils/fragHealth.ts.
 function getRpcUrl(originalUrl: string): string {
-  // Check if we're on Vercel (runtime check)
-  const isVercel = typeof window !== 'undefined' && 
-    (window.location.hostname.includes('vercel.app') || 
-     window.location.hostname.includes('vercel.com'));
-  
-  // In production/Vercel, use proxy for IP addresses (raw IP:port URLs)
-  // This avoids CORS and mixed content issues
-  if (isVercel && /^http:\/\/\d+\.\d+\.\d+\.\d+:\d+/.test(originalUrl)) {
-    // Use the Vercel API proxy
-    const proxyUrl = '/api/rpc-proxy?url=' + encodeURIComponent(originalUrl);
-    return proxyUrl;
-  }
-  // In development or for HTTPS URLs, use direct connection
-  return originalUrl;
+  if (process.env.NODE_ENV === 'development') return originalUrl;
+  return '/api/rpc-proxy?url=' + encodeURIComponent(originalUrl);
 }
 
 // Numbered endpoint slots. Gateway 1 (REACT_APP_GATEWAY_RPC_URL) and TEE Node 1
