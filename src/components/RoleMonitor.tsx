@@ -45,10 +45,10 @@ export function RoleMonitor({
           // Get chain ID from RPC
           const chainId = await client.getChainId();
 
-          // Use proxy on Vercel to keep API key server-side (never expose in client bundle)
-          // In local dev, serverless functions don't work, so we'll try the proxy first
-          // and fall back gracefully if it fails
-          
+          // Deployed builds go through /api/explorer-proxy, which holds the API key
+          // server-side so it never reaches the client bundle. Local dev has no
+          // serverless runtime, so it calls the explorer directly with the
+          // REACT_APP_ key instead.
           // Build query parameters
           const params = new URLSearchParams({
             chainid: chainId.toString(),

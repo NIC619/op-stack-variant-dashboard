@@ -64,7 +64,10 @@ module.exports = async function handler(req, res) {
   // Require a valid auth cookie (no-op if ACCESS_PASSWORD is not configured).
   if (!requireAuth(req, res)) return;
 
-  // Get the target RPC URL from query parameter
+  // The target RPC URL. Taken from req.query as-is and NOT decodeURIComponent'd: the
+  // platform's query parser has already decoded it once, and decoding again corrupts any
+  // URL that legitimately contains a percent escape — a %2F in a path would become a
+  // literal '/' and then fail the exact-match allowlist below with a confusing 403.
   const targetUrl = req.query.url;
   
   if (!targetUrl) {
@@ -72,8 +75,6 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: 'Missing url query parameter' });
   }
 
-  // Decode the URL
-  const decodedUrl = decodeURIComponent(targetUrl);
 
   // Reject disallowed methods BEFORE the URL is resolved, so a probe learns nothing about
   // which upstreams are configured.
@@ -101,19 +102,19 @@ module.exports = async function handler(req, res) {
     allowedUrls.push(process.env.REACT_APP_L2_RPC_URL);
   }
 
-  if (!allowedUrls.includes(decodedUrl)) {
-    console.error('URL not allowed:', decodedUrl);
+  if (!allowedUrls.includes(targetUrl)) {
+    console.error('URL not allowed:', targetUrl);
     console.error('Allowed URLs:', allowedUrls);
     return res.status(403).json({ 
       error: 'URL not allowed',
-      provided: decodedUrl,
+      provided: targetUrl,
       allowed: allowedUrls
     });
   }
 
   try {
     // Forward the request to the target RPC endpoint
-    const response = await fetch(decodedUrl, {
+    const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -339,7 +339,7 @@ Once connected to Vercel:
 
 #### Password Protection
 
-The dashboard includes optional password protection that **only activates on Vercel deployments** (not in local development).
+The dashboard includes optional password protection that **activates on any deployed build** — whether it is served from a `.vercel.app` URL or a custom domain — and never in local development (`npm start`).
 
 **To enable password protection:**
 
@@ -353,11 +353,12 @@ The dashboard includes optional password protection that **only activates on Ver
 2. **Local development is not affected** - when running `npm start` locally, no password is required
 
 **How it works:**
-- Password protection only activates when the site is accessed via a Vercel domain (`.vercel.app` or `.vercel.com`)
-- Password verification happens server-side via `/api/auth` (password never exposed in client bundle)
-- Authentication is stored in `sessionStorage` (cleared when the browser closes)
-- Users will see a password prompt before accessing the dashboard
-- If the password is not set in environment variables, access is automatically granted
+- The gate is keyed off the build type (`NODE_ENV`), not the hostname, so a deployment on a custom domain is protected just like a `.vercel.app` one
+- On load, the app asks `GET /api/auth` whether protection is configured and whether this browser still holds a valid session cookie
+- If `ACCESS_PASSWORD` is not set, that endpoint reports `configured: false` and the gate is skipped entirely — no prompt is shown
+- Password verification happens server-side via `POST /api/auth` (password never exposed in client bundle)
+- On success the server sets a signed, HttpOnly cookie (7 days); the API proxies verify that cookie, so they cannot be driven directly by anyone who knows the deployment URL
+- `sessionStorage` holds a UI hint only. It is re-checked against the server on every load, so an expired cookie (or a rotated `AUTH_SECRET`) returns the user to the login form instead of leaving a dashboard whose requests all fail
 
 **Security:**
 - ✅ Password is verified server-side (never exposed in client JavaScript)

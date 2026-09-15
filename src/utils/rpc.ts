@@ -14,22 +14,42 @@ if (!process.env.REACT_APP_MAIN_NODE_RPC_URL) {
 // TEE Prover panel instead, and leaving these unset simply omits their cards here rather
 // than rendering ones that can never load.
 
+// Every URL this app has been CONFIGURED with, i.e. every URL api/rpc-proxy will
+// relay. The proxy allowlists its target by exact string match against these same
+// env vars, so a URL absent from this set is guaranteed a 403 and must not be sent
+// there. Built lazily: RPC_ENDPOINTS is declared further down this module.
+let configuredUrls: Set<string> | null = null;
+function isConfiguredUrl(url: string): boolean {
+  if (!configuredUrls) {
+    configuredUrls = new Set(RPC_ENDPOINTS.map(e => e.url));
+    if (process.env.REACT_APP_L2_RPC_URL) {
+      configuredUrls.add(process.env.REACT_APP_L2_RPC_URL);
+    }
+  }
+  return configuredUrls.has(url);
+}
+
 // Resolve an endpoint URL for the browser: direct in local dev, through
-// /api/rpc-proxy in any production build.
+// /api/rpc-proxy in a deployed build.
 //
-// EVERY endpoint is proxied in production, not just raw http://IP:port ones. An
+// EVERY configured endpoint is proxied, not just raw http://IP:port ones. An
 // https:// hostname is no safer to call directly: these are op-geth nodes behind
 // nginx, and viem's application/json body forces a CORS preflight that geth
 // answers with a 400 "Parse error" and no Access-Control-* headers — the browser
 // then blocks the POST that would have succeeded, surfacing only "Failed to
-// fetch". Raw IP endpoints additionally fail as mixed content. The proxy fixes
-// both, and the URL must be set in the matching Vercel env var to pass its
-// allowlist (see api/rpc-proxy.js).
+// fetch". Raw IP endpoints additionally fail as mixed content. The proxy fixes both.
+//
+// An UNCONFIGURED url is called directly instead, because the proxy would reject
+// it. That is the Chain Status "Test Custom RPC" box: an arbitrary URL the user
+// typed, which by definition has no env var. Direct is the only thing that can
+// work there, and a CORS failure is a true answer about that endpoint — routing it
+// to the proxy would report 403 "URL not allowed" for every endpoint on earth.
 //
 // isLocalDev() rather than a vercel.app hostname check, so a deployment on a
 // custom domain is treated as production too.
 function getRpcUrl(originalUrl: string): string {
   if (isLocalDev()) return originalUrl;
+  if (!isConfiguredUrl(originalUrl)) return originalUrl;
   return '/api/rpc-proxy?url=' + encodeURIComponent(originalUrl);
 }
 
